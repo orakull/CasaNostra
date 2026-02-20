@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -23,6 +24,17 @@ kotlin {
             isStatic = true
         }
     }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName = provider { "composeApp" }
+        browser {
+            commonWebpackConfig {
+                outputFileName = "composeApp.js"
+            }
+        }
+        binaries.executable()
+    }
     
     sourceSets {
         androidMain.dependencies {
@@ -41,6 +53,11 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.coroutines.core)
+        }
+        val wasmJsMain by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
+            }
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
