@@ -15,6 +15,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 
 @Composable
 fun PlayerScreen(
@@ -42,12 +44,21 @@ fun PlayerScreen(
                     .padding(horizontal = 16.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "🎵 Casa Nostra",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = "Music",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Casa Nostra",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -111,7 +122,11 @@ fun PlayerScreen(
                 enabled = isLoaded,
                 modifier = Modifier.size(48.dp)
             ) {
-                Text("⏮", fontSize = 20.sp)
+                Icon(
+                    imageVector = Icons.Filled.FastRewind,
+                    contentDescription = "Rewind",
+                    modifier = Modifier.size(28.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -129,9 +144,10 @@ fun PlayerScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text(
-                    text = if (isPlaying) "⏸" else "▶",
-                    fontSize = 28.sp
+                Icon(
+                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    modifier = Modifier.size(36.dp)
                 )
             }
 
@@ -143,7 +159,11 @@ fun PlayerScreen(
                 enabled = isLoaded,
                 modifier = Modifier.size(48.dp)
             ) {
-                Text("⏹", fontSize = 20.sp)
+                Icon(
+                    imageVector = Icons.Filled.Stop,
+                    contentDescription = "Stop",
+                    modifier = Modifier.size(28.dp)
+                )
             }
         }
 
