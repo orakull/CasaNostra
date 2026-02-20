@@ -121,6 +121,7 @@ class PlayerViewModel : ViewModel() {
 
                 // Check if playback ended
                 if (durationMs > 0 && currentPositionMs >= durationMs) {
+                    player.stop()
                     isPlaying = false
                     currentPositionMs = durationMs
                     stopPositionUpdates()
