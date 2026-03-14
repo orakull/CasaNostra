@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun TrackRow(
@@ -84,16 +85,14 @@ fun TrackRow(
             LetterToggleButton(
                 text = "M",
                 isActive = isMuted,
-                activeContainerColor = MaterialTheme.colorScheme.errorContainer,
-                activeContentColor = MaterialTheme.colorScheme.onErrorContainer,
+                activeColor = Color(0xFF1976D2), // Material Blue 700
                 onClick = onMuteToggle
             )
 
             LetterToggleButton(
                 text = "S",
                 isActive = isSolo,
-                activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                activeColor = Color(0xFFFFC107), // Amber 500
                 onClick = onSoloToggle
             )
         }
@@ -104,8 +103,7 @@ fun TrackRow(
 private fun LetterToggleButton(
     text: String,
     isActive: Boolean,
-    activeContainerColor: androidx.compose.ui.graphics.Color,
-    activeContentColor: androidx.compose.ui.graphics.Color,
+    activeColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -114,13 +112,13 @@ private fun LetterToggleButton(
         modifier = modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(if (isActive) activeContainerColor else MaterialTheme.colorScheme.surfaceVariant)
+            .background(if (isActive) activeColor else MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.ExtraBold,
-            color = if (isActive) activeContentColor else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }

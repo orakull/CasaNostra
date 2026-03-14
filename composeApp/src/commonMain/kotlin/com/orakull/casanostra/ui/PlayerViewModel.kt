@@ -90,24 +90,20 @@ class PlayerViewModel : ViewModel() {
         if (trackIndex !in tracks.indices) return
         val newMuted = !tracks[trackIndex].isMuted
         tracks[trackIndex] = tracks[trackIndex].copy(isMuted = newMuted)
-        player.setTrackMute(trackIndex, newMuted)
+        updateEffectiveMutes()
     }
 
     fun toggleSolo(trackIndex: Int) {
         if (trackIndex !in tracks.indices) return
         val newSolo = !tracks[trackIndex].isSolo
         tracks[trackIndex] = tracks[trackIndex].copy(isSolo = newSolo)
+        updateEffectiveMutes()
+    }
 
-        // Apply solo logic: if any track is soloed, mute all non-soloed tracks
+    private fun updateEffectiveMutes() {
         val anySoloed = tracks.any { it.isSolo }
         tracks.forEachIndexed { index, track ->
-            val shouldMute = if (anySoloed) {
-                !track.isSolo && !track.isMuted  // Mute non-soloed (unless already manually muted)
-            } else {
-                track.isMuted
-            }
-            // When solo is active, non-soloed tracks are silenced
-            val effectiveMute = if (anySoloed && !track.isSolo) true else track.isMuted
+            val effectiveMute = if (anySoloed) !track.isSolo else track.isMuted
             player.setTrackMute(index, effectiveMute)
         }
     }
