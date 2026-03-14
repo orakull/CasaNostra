@@ -37,10 +37,13 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp)
-            ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val isLandscape = maxWidth > maxHeight
+                
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
                 // Aesthetic Header Region - scrolls away
                 item {
                     Box(
@@ -96,92 +99,186 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
                         shadowElevation = 8.dp
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 32.dp, vertical = 16.dp)
-                        ) {
-                            Slider(
-                                value = if (durationMs > 0) {
-                                    (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                                } else 0f,
-                                onValueChange = { fraction ->
-                                    viewModel.seekTo((fraction * durationMs).toLong())
-                                },
-                                enabled = isLoaded,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            )
-
+                        if (isLandscape) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().offset(y = (-8).dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = formatTime(currentPositionMs),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = formatTime(durationMs),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                IconButton(
-                                    onClick = { viewModel.seekTo(0) },
-                                    enabled = isLoaded,
-                                    modifier = Modifier.size(48.dp)
+                                // Transport Controls
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.FastRewind,
-                                        contentDescription = "Rewind",
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onBackground
+                                    IconButton(
+                                        onClick = { viewModel.seekTo(0) },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.FastRewind,
+                                            contentDescription = "Rewind",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (isPlaying) viewModel.pause() else viewModel.play()
+                                        },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.padding(horizontal = 8.dp).size(48.dp),
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            contentDescription = if (isPlaying) "Pause" else "Play",
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { viewModel.stop() },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Stop,
+                                            contentDescription = "Stop",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(24.dp))
+                                // Progress Time & Slider
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = formatTime(currentPositionMs),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Slider(
+                                        value = if (durationMs > 0) {
+                                            (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                                        } else 0f,
+                                        onValueChange = { fraction ->
+                                            viewModel.seekTo((fraction * durationMs).toLong())
+                                        },
+                                        enabled = isLoaded,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = MaterialTheme.colorScheme.primary,
+                                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                        ),
+                                        modifier = Modifier.weight(1f).height(24.dp)
+                                    )
+                                    Text(
+                                        text = formatTime(durationMs),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-
-                                FilledIconButton(
-                                    onClick = {
-                                        if (isPlaying) viewModel.pause() else viewModel.play()
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                            ) {
+                                Slider(
+                                    value = if (durationMs > 0) {
+                                        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+                                    } else 0f,
+                                    onValueChange = { fraction ->
+                                        viewModel.seekTo((fraction * durationMs).toLong())
                                     },
                                     enabled = isLoaded,
-                                    modifier = Modifier.size(72.dp),
-                                    shape = CircleShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
-                                    )
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = MaterialTheme.colorScheme.primary,
+                                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                    modifier = Modifier.height(24.dp)
+                                )
+    
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().offset(y = (-4).dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Icon(
-                                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                        contentDescription = if (isPlaying) "Pause" else "Play",
-                                        modifier = Modifier.size(36.dp)
+                                    Text(
+                                        text = formatTime(currentPositionMs),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = formatTime(durationMs),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-
-                                IconButton(
-                                    onClick = { viewModel.stop() },
-                                    enabled = isLoaded,
-                                    modifier = Modifier.size(48.dp)
+    
+                                Spacer(modifier = Modifier.height(8.dp))
+    
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Stop,
-                                        contentDescription = "Stop",
-                                        modifier = Modifier.size(28.dp),
-                                        tint = MaterialTheme.colorScheme.onBackground
-                                    )
+                                    IconButton(
+                                        onClick = { viewModel.seekTo(0) },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.FastRewind,
+                                            contentDescription = "Rewind",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+    
+                                    FilledIconButton(
+                                        onClick = {
+                                            if (isPlaying) viewModel.pause() else viewModel.play()
+                                        },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.size(56.dp),
+                                        shape = CircleShape,
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            contentDescription = if (isPlaying) "Pause" else "Play",
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                    }
+    
+                                    IconButton(
+                                        onClick = { viewModel.stop() },
+                                        enabled = isLoaded,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Stop,
+                                            contentDescription = "Stop",
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -200,6 +297,7 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                         onSoloToggle = { viewModel.toggleSolo(index) }
                     )
                 }
+            }
             }
         }
     }
