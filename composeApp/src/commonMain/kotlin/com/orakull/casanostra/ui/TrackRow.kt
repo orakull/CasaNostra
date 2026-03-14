@@ -81,37 +81,46 @@ fun TrackRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Mute toggle
-            IconButton(
-                onClick = onMuteToggle,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(if (isMuted) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Text(
-                    text = "M",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isMuted) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            LetterToggleButton(
+                text = "M",
+                isActive = isMuted,
+                activeContainerColor = MaterialTheme.colorScheme.errorContainer,
+                activeContentColor = MaterialTheme.colorScheme.onErrorContainer,
+                onClick = onMuteToggle
+            )
 
-            // Solo toggle
-            IconButton(
-                onClick = onSoloToggle,
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(if (isSolo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Text(
-                    text = "S",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isSolo) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            LetterToggleButton(
+                text = "S",
+                isActive = isSolo,
+                activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onSoloToggle
+            )
         }
+    }
+}
+
+@Composable
+private fun LetterToggleButton(
+    text: String,
+    isActive: Boolean,
+    activeContainerColor: androidx.compose.ui.graphics.Color,
+    activeContentColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(if (isActive) activeContainerColor else MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = if (isActive) activeContentColor else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

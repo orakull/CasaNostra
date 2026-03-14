@@ -47,49 +47,7 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(260.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(100.dp)
-                                        .background(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            CircleShape
-                                        )
-                                        .padding(20.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.MusicNote,
-                                        contentDescription = "Music",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(56.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Text(
-                                    text = "Casa Nostra",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "Мультитрек-Сессия",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        AestheticHeader()
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
@@ -108,89 +66,24 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                     .padding(horizontal = 24.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Transport Controls
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(
-                                        onClick = { viewModel.seekTo(0) },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.FastRewind,
-                                            contentDescription = "Rewind",
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.onBackground
-                                        )
-                                    }
-
-                                    FilledIconButton(
-                                        onClick = {
-                                            if (isPlaying) viewModel.pause() else viewModel.play()
-                                        },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.padding(horizontal = 8.dp).size(48.dp),
-                                        shape = CircleShape,
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                            contentDescription = if (isPlaying) "Pause" else "Play",
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { viewModel.stop() },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Stop,
-                                            contentDescription = "Stop",
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.onBackground
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(24.dp))
-                                // Progress Time & Slider
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = formatTime(currentPositionMs),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Slider(
-                                        value = if (durationMs > 0) {
-                                            (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                                        } else 0f,
-                                        onValueChange = { fraction ->
-                                            viewModel.seekTo((fraction * durationMs).toLong())
-                                        },
-                                        enabled = isLoaded,
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = MaterialTheme.colorScheme.primary,
-                                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                        ),
-                                        modifier = Modifier.weight(1f).height(24.dp)
-                                    )
-                                    Text(
-                                        text = formatTime(durationMs),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                                TransportControls(
+                                    isPlaying = isPlaying,
+                                    onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
+                                    onRewind = { viewModel.seekTo(0) },
+                                    onStop = { viewModel.stop() },
+                                    isLoaded = isLoaded,
+                                    playButtonSize = 48.dp,
+                                    playIconSize = 24.dp,
+                                    modifier = Modifier.padding(end = 24.dp)
+                                )
+                                ProgressBar(
+                                    currentPositionMs = currentPositionMs,
+                                    durationMs = durationMs,
+                                    isLoaded = isLoaded,
+                                    onSeek = { viewModel.seekTo(it) },
+                                    isLandscape = true,
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
                         } else {
                             Column(
@@ -198,90 +91,23 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                     .fillMaxWidth()
                                     .padding(horizontal = 24.dp, vertical = 8.dp)
                             ) {
-                                Slider(
-                                    value = if (durationMs > 0) {
-                                        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
-                                    } else 0f,
-                                    onValueChange = { fraction ->
-                                        viewModel.seekTo((fraction * durationMs).toLong())
-                                    },
-                                    enabled = isLoaded,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = MaterialTheme.colorScheme.primary,
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    modifier = Modifier.height(24.dp)
+                                ProgressBar(
+                                    currentPositionMs = currentPositionMs,
+                                    durationMs = durationMs,
+                                    isLoaded = isLoaded,
+                                    onSeek = { viewModel.seekTo(it) },
+                                    isLandscape = false,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-    
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().offset(y = (-4).dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = formatTime(currentPositionMs),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = formatTime(durationMs),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-    
                                 Spacer(modifier = Modifier.height(8.dp))
-    
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(
-                                        onClick = { viewModel.seekTo(0) },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.FastRewind,
-                                            contentDescription = "Rewind",
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.onBackground
-                                        )
-                                    }
-    
-                                    FilledIconButton(
-                                        onClick = {
-                                            if (isPlaying) viewModel.pause() else viewModel.play()
-                                        },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.size(56.dp),
-                                        shape = CircleShape,
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                            contentDescription = if (isPlaying) "Pause" else "Play",
-                                            modifier = Modifier.size(28.dp)
-                                        )
-                                    }
-    
-                                    IconButton(
-                                        onClick = { viewModel.stop() },
-                                        enabled = isLoaded,
-                                        modifier = Modifier.size(40.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Stop,
-                                            contentDescription = "Stop",
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.onBackground
-                                        )
-                                    }
-                                }
+                                TransportControls(
+                                    isPlaying = isPlaying,
+                                    onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
+                                    onRewind = { viewModel.seekTo(0) },
+                                    onStop = { viewModel.stop() },
+                                    isLoaded = isLoaded,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }
@@ -303,6 +129,190 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+@Composable
+private fun AestheticHeader() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                        shape = CircleShape
+                    )
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = "Music",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Casa Nostra",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Мультитрек-Сессия",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun TransportControls(
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
+    onRewind: () -> Unit,
+    onStop: () -> Unit,
+    isLoaded: Boolean,
+    modifier: Modifier = Modifier,
+    playButtonSize: androidx.compose.ui.unit.Dp = 56.dp,
+    playIconSize: androidx.compose.ui.unit.Dp = 28.dp
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onRewind,
+            enabled = isLoaded,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.FastRewind,
+                contentDescription = "Rewind",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onBackground
+            )
+        }
+
+        FilledIconButton(
+            onClick = onPlayPause,
+            enabled = isLoaded,
+            modifier = Modifier.size(playButtonSize),
+            shape = CircleShape,
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Icon(
+                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (isPlaying) "Pause" else "Play",
+                modifier = Modifier.size(playIconSize)
+            )
+        }
+
+        IconButton(
+            onClick = onStop,
+            enabled = isLoaded,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Stop,
+                contentDescription = "Stop",
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.onBackground
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressBar(
+    currentPositionMs: Long,
+    durationMs: Long,
+    isLoaded: Boolean,
+    onSeek: (Long) -> Unit,
+    isLandscape: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val sliderValue = if (durationMs > 0) {
+        (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    if (isLandscape) {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = formatTime(currentPositionMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            SliderWrapper(sliderValue, durationMs, onSeek, isLoaded, Modifier.weight(1f))
+            Text(
+                text = formatTime(durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        Column(modifier = modifier) {
+            SliderWrapper(sliderValue, durationMs, onSeek, isLoaded, Modifier.fillMaxWidth())
+            Row(
+                modifier = Modifier.fillMaxWidth().offset(y = (-4).dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = formatTime(currentPositionMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatTime(durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SliderWrapper(
+    value: Float,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+    isLoaded: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Slider(
+        value = value,
+        onValueChange = { fraction ->
+            onSeek((fraction * durationMs).toLong())
+        },
+        enabled = isLoaded,
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        modifier = modifier.height(24.dp)
+    )
 }
 
 private fun formatTime(ms: Long): String {
