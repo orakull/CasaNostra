@@ -32,11 +32,21 @@ fun TrackRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
-            .padding(16.dp),
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Track color indicator
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(32.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(track.color)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+
         // Info and Volume
         Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(
@@ -62,9 +72,9 @@ fun TrackRow(
                     valueRange = 0f..1f,
                     modifier = Modifier.weight(1f).height(24.dp),
                     colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.onSurface,
-                        activeTrackColor = MaterialTheme.colorScheme.onSurface,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        thumbColor = track.color,
+                        activeTrackColor = track.color,
+                        inactiveTrackColor = track.color.copy(alpha = 0.2f)
                     )
                 )
                 Spacer(modifier = Modifier.width(12.dp))
