@@ -45,51 +45,53 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                 // Aesthetic Header Region - scrolls away
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                        CircleShape
+                if (!isLandscape) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                            CircleShape
+                                        )
+                                        .padding(20.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.MusicNote,
+                                        contentDescription = "Music",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(56.dp)
                                     )
-                                    .padding(20.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.MusicNote,
-                                    contentDescription = "Music",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(56.dp)
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Text(
+                                    text = "Casa Nostra",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Мультитрек-Сессия",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text(
-                                text = "Casa Nostra",
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Мультитрек-Сессия",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
+                        Spacer(modifier = Modifier.height(32.dp))
                     }
-                    Spacer(modifier = Modifier.height(32.dp))
                 }
 
                 // Pinned Transport & Progress
