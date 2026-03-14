@@ -10,7 +10,8 @@ data class TrackState(
     val name: String,
     val volume: Float = 1.0f,
     val isMuted: Boolean = false,
-    val isSolo: Boolean = false
+    val isSolo: Boolean = false,
+    val color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent
 )
 
 class PlayerViewModel : ViewModel() {
@@ -35,6 +36,17 @@ class PlayerViewModel : ViewModel() {
     private var positionJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    private val trackColorPool = listOf(
+        androidx.compose.ui.graphics.Color(0xFFEF9A9A), // Soft Red/Pink (Hue ~0)
+        androidx.compose.ui.graphics.Color(0xFFCE93D8),  // Soft Purple (Hue ~280)
+        androidx.compose.ui.graphics.Color(0xFF81D4FA), // Soft Blue (Hue ~200)
+        androidx.compose.ui.graphics.Color(0xFF80DEEA), // Soft Cyan (Hue ~180)
+        androidx.compose.ui.graphics.Color(0xFFA5D6A7), // Soft Green (Hue ~120)
+        androidx.compose.ui.graphics.Color(0xFFE6EE9C), // Soft Lime (Hue ~65)
+        androidx.compose.ui.graphics.Color(0xFFFFF59D), // Soft Yellow (Hue ~50)
+        androidx.compose.ui.graphics.Color(0xFFFFCC80), // Soft Orange (Hue ~35)
+    )
+
     fun loadTracks(trackInfos: List<TrackInfo>) {
         val trackNames = listOf("Бас (Вокал)", "Тенор (Фортепиано)", "Тенор (Вокал)")
         player.loadTracks(trackInfos)
@@ -43,7 +55,8 @@ class PlayerViewModel : ViewModel() {
         trackInfos.forEachIndexed { index, _ ->
             tracks.add(
                 TrackState(
-                    name = trackNames.getOrElse(index) { "Дорожка ${index + 1}" }
+                    name = trackNames.getOrElse(index) { "Дорожка ${index + 1}" },
+                    color = trackColorPool[index % trackColorPool.size]
                 )
             )
         }
@@ -90,24 +103,20 @@ class PlayerViewModel : ViewModel() {
         if (trackIndex !in tracks.indices) return
         val newMuted = !tracks[trackIndex].isMuted
         tracks[trackIndex] = tracks[trackIndex].copy(isMuted = newMuted)
-        player.setTrackMute(trackIndex, newMuted)
+        updateEffectiveMutes()
     }
 
     fun toggleSolo(trackIndex: Int) {
         if (trackIndex !in tracks.indices) return
         val newSolo = !tracks[trackIndex].isSolo
         tracks[trackIndex] = tracks[trackIndex].copy(isSolo = newSolo)
+        updateEffectiveMutes()
+    }
 
-        // Apply solo logic: if any track is soloed, mute all non-soloed tracks
+    private fun updateEffectiveMutes() {
         val anySoloed = tracks.any { it.isSolo }
         tracks.forEachIndexed { index, track ->
-            val shouldMute = if (anySoloed) {
-                !track.isSolo && !track.isMuted  // Mute non-soloed (unless already manually muted)
-            } else {
-                track.isMuted
-            }
-            // When solo is active, non-soloed tracks are silenced
-            val effectiveMute = if (anySoloed && !track.isSolo) true else track.isMuted
+            val effectiveMute = if (anySoloed) !track.isSolo else track.isMuted
             player.setTrackMute(index, effectiveMute)
         }
     }
