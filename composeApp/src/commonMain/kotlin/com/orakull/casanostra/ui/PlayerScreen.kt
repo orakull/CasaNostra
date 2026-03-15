@@ -23,6 +23,8 @@ fun PlayerScreen(
     onLogout: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    LockScreenOrientation(ScreenOrientation.Unspecified)
+
     val isPlaying = viewModel.isPlaying
     val currentPositionMs = viewModel.currentPositionMs
     val durationMs = viewModel.durationMs
