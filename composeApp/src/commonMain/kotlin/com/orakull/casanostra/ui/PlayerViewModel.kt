@@ -2,9 +2,23 @@ package com.orakull.casanostra.ui
 
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import androidx.lifecycle.viewModelScope
+import com.orakull.casanostra.data.repository.ProjectRepository
+import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
-import kotlinx.coroutines.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancel
 
 data class TrackState(
     val name: String,
@@ -14,7 +28,41 @@ data class TrackState(
     val color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent
 )
 
-class PlayerViewModel : ViewModel() {
+class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
+
+    private val _project = MutableStateFlow<Project?>(null)
+    val project: StateFlow<Project?> = _project.asStateFlow()
+
+    fun setProject(project: Project) {
+        _project.value = project
+    }
+
+    fun renameProject(newName: String) {
+        val project = _project.value ?: return
+        if (newName.isBlank() || newName == project.name) return
+
+        viewModelScope.launch {
+            try {
+                repository.updateProjectName(project.id, newName)
+                _project.update { it?.copy(name = newName) }
+            } catch (e: Exception) {
+                // Handle error if needed
+            }
+        }
+    }
+
+    fun deleteProject(onSuccess: () -> Unit) {
+        val project = _project.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.deleteProject(project.id)
+                _project.value = null
+                onSuccess()
+            } catch (e: Exception) {
+                // Handle error if needed
+            }
+        }
+    }
 
     val player = MultitrackPlayer()
 

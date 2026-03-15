@@ -13,8 +13,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import casanostra.composeapp.generated.resources.Res
 import com.orakull.casanostra.audio.TrackInfo
+import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.ui.*
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
@@ -64,31 +66,64 @@ fun App() {
                 }
 
                 is AuthState.Authenticated -> {
-                    val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel() }
-                    val scope = rememberCoroutineScope()
-
-                    LaunchedEffect(Unit) {
-                        scope.launch {
-                            val trackFiles = listOf(
-                                "files/bass_vocals.wav" to "Бас (Вокал)",
-                                "files/tenor_piano.wav" to "Тенор (Фортепиано)",
-                                "files/tenor_vocals.wav" to "Тенор (Вокал)"
+                    var currentScreen by remember { mutableStateOf("projects") }
+                    var selectedProject by remember { mutableStateOf<Project?>(null) }
+                    
+                    AnimatedContent(
+                        targetState = currentScreen,
+                        transitionSpec = {
+                            if (targetState == "player") {
+                                slideInHorizontally { width -> width } + fadeIn() togetherWith slideOutHorizontally { width -> -width } + fadeOut()
+                            } else {
+                                slideInHorizontally { width -> -width } + fadeIn() togetherWith slideOutHorizontally { width -> width } + fadeOut()
+                            }
+                        }
+                    ) { screen ->
+                        if (screen == "projects") {
+                            val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
+                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
+                            val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(repository, supabaseClient) }
+                            ProjectsScreen(
+                                viewModel = projectsViewModel,
+                                onProjectSelected = { project -> 
+                                    selectedProject = project
+                                    currentScreen = "player" 
+                                },
+                                onLogout = { 
+                                    repository.clearProjects()
+                                    authViewModel.signOut() 
+                                }
                             )
+                        } else if (screen == "player") {
+                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
+                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository) }
+                            val scope = rememberCoroutineScope()
+                            
+                            LaunchedEffect(selectedProject) {
+                                selectedProject?.let { playerViewModel.setProject(it) }
+                                scope.launch {
+                                    val trackFiles = listOf(
+                                        "files/bass_vocals.wav" to "Бас (Вокал)",
+                                        "files/tenor_piano.wav" to "Тенор (Фортепиано)",
+                                        "files/tenor_vocals.wav" to "Тенор (Вокал)"
+                                    )
 
-                            val trackInfos = trackFiles.map { (path, name) ->
-                                val bytes = Res.readBytes(path)
-                                TrackInfo(name = name, resourceBytes = bytes)
+                                    val trackInfos = trackFiles.map { (path, name) ->
+                                        val bytes = Res.readBytes(path)
+                                        TrackInfo(name = name, resourceBytes = bytes)
+                                    }
+
+                                    playerViewModel.loadTracks(trackInfos)
+                                }
                             }
 
-                            playerViewModel.loadTracks(trackInfos)
+                            PlayerScreen(
+                                viewModel = playerViewModel,
+                                onBack = { currentScreen = "projects" },
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
-
-                    PlayerScreen(
-                        viewModel = playerViewModel,
-                        onLogout = { authViewModel.signOut() },
-                        modifier = Modifier.fillMaxSize()
-                    )
                 }
             }
         }

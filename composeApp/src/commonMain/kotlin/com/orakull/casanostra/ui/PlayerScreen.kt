@@ -9,18 +9,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
-    onLogout: () -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LockScreenOrientation(ScreenOrientation.Unspecified)
@@ -30,6 +35,10 @@ fun PlayerScreen(
     val durationMs = viewModel.durationMs
     val tracks = viewModel.tracks
     val isLoaded = viewModel.isLoaded
+    val project by viewModel.project.collectAsState()
+    
+    var isEditingName by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -53,7 +62,12 @@ fun PlayerScreen(
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
-                        AestheticHeader(onLogout = onLogout)
+                        AestheticHeader(
+                            projectName = project?.name ?: "Проект",
+                            onBack = onBack,
+                            onRenameClick = { isEditingName = true },
+                            onDeleteClick = { showDeleteConfirmation = true }
+                        )
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
@@ -132,13 +146,80 @@ fun PlayerScreen(
                     )
                 }
             }
-            }
         }
+    }
+
+    if (isEditingName) {
+        var newName by remember { mutableStateOf(project?.name ?: "") }
+        val focusRequester = remember { FocusRequester() }
+
+        AlertDialog(
+            onDismissRequest = { isEditingName = false },
+            title = { Text("Переименовать проект") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Название") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.focusRequester(focusRequester)
+                )
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newName.isNotBlank()) {
+                        viewModel.renameProject(newName)
+                        isEditingName = false
+                    }
+                }) {
+                    Text("Сохранить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isEditingName = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Удалить проект?") },
+            text = { Text("Проект \"${project?.name ?: ""}\" будет удален безвозвратно. Это действие нельзя отменить.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteProject(onSuccess = onBack)
+                        showDeleteConfirmation = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
     }
 }
 
 @Composable
-private fun AestheticHeader(onLogout: () -> Unit = {}) {
+private fun AestheticHeader(
+    projectName: String, 
+    onBack: () -> Unit,
+    onRenameClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,17 +229,31 @@ private fun AestheticHeader(onLogout: () -> Unit = {}) {
                 shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
             )
     ) {
-        // Logout button in top-right corner
+        // Back button in top-left corner
         IconButton(
-            onClick = onLogout,
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Назад к проектам",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Delete button in top-right corner
+        IconButton(
+            onClick = onDeleteClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Filled.ExitToApp,
-                contentDescription = "Выйти",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "Удалить проект",
+                tint = MaterialTheme.colorScheme.error
             )
         }
 
@@ -184,12 +279,22 @@ private fun AestheticHeader(onLogout: () -> Unit = {}) {
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Casa Nostra",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            OutlinedButton(
+                onClick = onRenameClick,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                border = null,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = projectName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Мультитрек-Сессия",
