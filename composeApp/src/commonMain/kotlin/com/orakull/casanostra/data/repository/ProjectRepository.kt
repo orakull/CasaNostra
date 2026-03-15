@@ -51,7 +51,31 @@ class ProjectRepository(private val supabaseClient: SupabaseClient) {
                     }
                 }
         } catch (e: Exception) {
-            // Revert on failure (we would ideally re-fetch or keep the old state to revert)
+            // Revert on failure
+            throw e
+        }
+    }
+
+    suspend fun deleteProject(projectId: String) {
+        val projectToRemove = _projects.value.find { it.id == projectId }
+        
+        // Optimistic update
+        _projects.update { current ->
+            current.filter { it.id != projectId }
+        }
+
+        try {
+            supabaseClient.from("projects")
+                .delete {
+                    filter {
+                        eq("id", projectId)
+                    }
+                }
+        } catch (e: Exception) {
+            // Revert on failure
+            if (projectToRemove != null) {
+                _projects.update { current -> listOf(projectToRemove) + current }
+            }
             throw e
         }
     }

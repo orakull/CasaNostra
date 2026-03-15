@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ fun PlayerScreen(
     val project by viewModel.project.collectAsState()
     
     var isEditingName by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -63,7 +65,8 @@ fun PlayerScreen(
                         AestheticHeader(
                             projectName = project?.name ?: "Проект",
                             onBack = onBack,
-                            onRenameClick = { isEditingName = true }
+                            onRenameClick = { isEditingName = true },
+                            onDeleteClick = { showDeleteConfirmation = true }
                         )
                         Spacer(modifier = Modifier.height(32.dp))
                     }
@@ -183,6 +186,30 @@ fun PlayerScreen(
             }
         )
     }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Удалить проект?") },
+            text = { Text("Проект \"${project?.name ?: ""}\" будет удален безвозвратно. Это действие нельзя отменить.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteProject(onSuccess = onBack)
+                        showDeleteConfirmation = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
     }
 }
 
@@ -190,7 +217,8 @@ fun PlayerScreen(
 private fun AestheticHeader(
     projectName: String, 
     onBack: () -> Unit,
-    onRenameClick: () -> Unit
+    onRenameClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -212,6 +240,20 @@ private fun AestheticHeader(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Назад к проектам",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Delete button in top-right corner
+        IconButton(
+            onClick = onDeleteClick,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = "Удалить проект",
+                tint = MaterialTheme.colorScheme.error
             )
         }
 

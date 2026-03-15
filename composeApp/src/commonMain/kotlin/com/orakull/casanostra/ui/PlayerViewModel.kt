@@ -51,6 +51,19 @@ class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
         }
     }
 
+    fun deleteProject(onSuccess: () -> Unit) {
+        val project = _project.value ?: return
+        viewModelScope.launch {
+            try {
+                repository.deleteProject(project.id)
+                _project.value = null
+                onSuccess()
+            } catch (e: Exception) {
+                // Handle error if needed
+            }
+        }
+    }
+
     val player = MultitrackPlayer()
 
     var tracks = mutableStateListOf<TrackState>()
