@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +25,7 @@ fun TrackRow(
     onVolumeChange: (Float) -> Unit,
     onMuteToggle: () -> Unit,
     onSoloToggle: () -> Unit,
+    onTrackClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isMuted = track.isMuted
@@ -33,7 +35,9 @@ fun TrackRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 8.dp)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable { onTrackClick() }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

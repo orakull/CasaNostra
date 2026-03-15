@@ -68,6 +68,11 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+
+            // File Pickers
+            implementation(libs.filekit.core)
+            implementation(libs.filekit.compose)
         }
         val iosMain by creating {
             dependsOn(commonMain.get())

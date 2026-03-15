@@ -96,7 +96,8 @@ fun App() {
                             )
                         } else if (screen == "player") {
                             val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
-                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository) }
+                            val trackRepository = koinInject<com.orakull.casanostra.data.repository.TrackRepository>()
+                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository, trackRepository) }
                             val scope = rememberCoroutineScope()
                             
                             LaunchedEffect(selectedProject) {

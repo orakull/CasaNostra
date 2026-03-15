@@ -20,4 +20,5 @@ val supabaseModule = module {
     }
     
     single { com.orakull.casanostra.data.repository.ProjectRepository(get()) }
+    single { com.orakull.casanostra.data.repository.TrackRepository(get()) }
 }

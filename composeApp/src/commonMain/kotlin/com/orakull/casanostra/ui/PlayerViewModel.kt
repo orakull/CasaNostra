@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import androidx.lifecycle.viewModelScope
 import com.orakull.casanostra.data.repository.ProjectRepository
+import com.orakull.casanostra.data.repository.TrackRepository
 import com.orakull.casanostra.data.models.Project
+import com.orakull.casanostra.data.models.ProjectTrack
 import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
 import kotlinx.coroutines.launch
@@ -28,13 +30,22 @@ data class TrackState(
     val color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent
 )
 
-class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
+class PlayerViewModel(
+    private val repository: ProjectRepository,
+    private val trackRepository: TrackRepository
+) : ViewModel() {
 
     private val _project = MutableStateFlow<Project?>(null)
     val project: StateFlow<Project?> = _project.asStateFlow()
 
+    // Expose tracks from repository
+    val projectTracks: StateFlow<List<ProjectTrack>> = trackRepository.tracks
+
     fun setProject(project: Project) {
         _project.value = project
+        viewModelScope.launch {
+            trackRepository.fetchTracks(project.id)
+        }
     }
 
     fun renameProject(newName: String) {
@@ -60,6 +71,39 @@ class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
                 onSuccess()
             } catch (e: Exception) {
                 // Handle error if needed
+            }
+        }
+    }
+
+    fun uploadAudio(file: io.github.vinceglb.filekit.core.PlatformFile) {
+        val project = _project.value ?: return
+        viewModelScope.launch {
+            try {
+                val bytes = file.readBytes()
+                trackRepository.uploadTrack(project.id, file.name, bytes)
+            } catch (e: Exception) {
+                println("UPLOAD_ERROR: ${e::class.simpleName}: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun deleteTrack(trackId: String, filePath: String) {
+        viewModelScope.launch {
+            try {
+                trackRepository.deleteTrack(trackId, filePath)
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
+    }
+
+    fun renameTrack(trackId: String, newName: String) {
+        viewModelScope.launch {
+            try {
+                trackRepository.renameTrack(trackId, newName)
+            } catch (e: Exception) {
+                // Handle error
             }
         }
     }
