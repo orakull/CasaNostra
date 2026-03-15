@@ -29,6 +29,10 @@ fun ProjectsScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    LaunchedEffect(viewModel) {
+        viewModel.loadProjects()
+    }
+    
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Scaffold(

@@ -79,4 +79,8 @@ class ProjectRepository(private val supabaseClient: SupabaseClient) {
             throw e
         }
     }
+
+    fun clearProjects() {
+        _projects.value = emptyList()
+    }
 }

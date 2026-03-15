@@ -89,7 +89,10 @@ fun App() {
                                     selectedProject = project
                                     currentScreen = "player" 
                                 },
-                                onLogout = { authViewModel.signOut() }
+                                onLogout = { 
+                                    repository.clearProjects()
+                                    authViewModel.signOut() 
+                                }
                             )
                         } else if (screen == "player") {
                             val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()

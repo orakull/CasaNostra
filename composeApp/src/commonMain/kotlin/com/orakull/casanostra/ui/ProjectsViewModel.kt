@@ -48,7 +48,10 @@ class ProjectsViewModel(
 
     fun loadProjects() {
         viewModelScope.launch {
-            state = ProjectsState.Loading
+            // Если мы уже загрузили проекты для этого юзера, не сбрасываем стейт на Loading
+            if (repository.projects.value.isEmpty()) {
+                state = ProjectsState.Loading
+            }
             try {
                 val userId = supabaseClient.auth.currentUserOrNull()?.id
                 if (userId == null) {
@@ -57,6 +60,10 @@ class ProjectsViewModel(
                 }
 
                 repository.fetchProjects(userId)
+                
+                // Гарантируем, что после запроса стейт станет Success, 
+                // даже если StateFlow не заэмитил новое значение (например, если проектов 0)
+                state = ProjectsState.Success(repository.projects.value)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
             }
