@@ -15,11 +15,6 @@ class MainActivity : ComponentActivity() {
 
         initAudioContext(this)
 
-        startKoin {
-            androidContext(this@MainActivity)
-            modules(supabaseModule)
-        }
-
         setContent {
             App()
         }
