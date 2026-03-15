@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,49 +42,53 @@ fun ProjectsScreen(
             }
         }
     ) { padding ->
-        LazyColumn(
+        PullToRefreshBox(
+            isRefreshing = viewModel.isRefreshing,
+            onRefresh = { viewModel.refreshProjects() },
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            item {
-                AestheticProjectsHeader(
-                    userEmail = viewModel.currentUserEmail ?: "Пользователь",
-                    onLogout = onLogout
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                item {
+                    AestheticProjectsHeader(
+                        userEmail = viewModel.currentUserEmail ?: "Пользователь",
+                        onLogout = onLogout
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-            when (val state = viewModel.state) {
-                is ProjectsState.Loading -> {
-                    item {
-                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
+                when (val state = viewModel.state) {
+                    is ProjectsState.Loading -> {
+                        item {
+                            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
                         }
                     }
-                }
-                is ProjectsState.Error -> {
-                    item {
-                        Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                "Ошибка: ${state.message}",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                }
-                is ProjectsState.Success -> {
-                    if (state.projects.isEmpty()) {
+                    is ProjectsState.Error -> {
                         item {
                             Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                                 Text(
-                                    "У вас пока нет проектов. Создайте первый!",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    "Ошибка: ${state.message}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                             }
                         }
-                    } else {
-                        items(state.projects) { project ->
-                            ProjectItem(project, onClick = { onProjectSelected(project) })
+                    }
+                    is ProjectsState.Success -> {
+                        if (state.projects.isEmpty()) {
+                            item {
+                                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    Text(
+                                        "У вас пока нет проектов. Создайте первый!",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            items(state.projects) { project ->
+                                ProjectItem(project, onClick = { onProjectSelected(project) })
+                            }
                         }
                     }
                 }

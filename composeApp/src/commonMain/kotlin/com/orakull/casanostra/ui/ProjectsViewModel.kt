@@ -24,6 +24,9 @@ class ProjectsViewModel(
     var state by mutableStateOf<ProjectsState>(ProjectsState.Loading)
         private set
 
+    var isRefreshing by mutableStateOf(false)
+        private set
+
     val currentUserEmail: String?
         get() = supabaseClient.auth.currentUserOrNull()?.email
 
@@ -51,6 +54,30 @@ class ProjectsViewModel(
                 state = ProjectsState.Success(projects)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
+            }
+        }
+    }
+
+    fun refreshProjects() {
+        if (state is ProjectsState.Loading) return
+        viewModelScope.launch {
+            isRefreshing = true
+            try {
+                val userId = supabaseClient.auth.currentUserOrNull()?.id
+                if (userId == null) {
+                    state = ProjectsState.Error("Пользователь не авторизован")
+                    return@launch
+                }
+
+                val projects = supabaseClient.postgrest["projects"]
+                    .select()
+                    .decodeList<Project>()
+
+                state = ProjectsState.Success(projects)
+            } catch (e: Exception) {
+                state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
+            } finally {
+                isRefreshing = false
             }
         }
     }

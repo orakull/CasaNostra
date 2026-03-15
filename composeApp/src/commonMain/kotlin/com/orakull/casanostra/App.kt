@@ -16,6 +16,7 @@ import com.orakull.casanostra.audio.TrackInfo
 import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.ui.*
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
@@ -79,7 +80,8 @@ fun App() {
                         }
                     ) { screen ->
                         if (screen == "projects") {
-                            val projectsViewModel: ProjectsViewModel = viewModel { ProjectsViewModel(supabaseClient) }
+                            val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
+                            val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(supabaseClient) }
                             ProjectsScreen(
                                 viewModel = projectsViewModel,
                                 onProjectSelected = { project -> 
