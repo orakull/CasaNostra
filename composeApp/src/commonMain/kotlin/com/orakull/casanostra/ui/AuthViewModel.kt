@@ -19,10 +19,7 @@ sealed class AuthState {
     data object Authenticated : AuthState()
 }
 
-data class RegistrationResult(
-    val email: String,
-    val password: String
-)
+
 
 class AuthViewModel(
     private val supabaseClient: SupabaseClient
@@ -40,14 +37,7 @@ class AuthViewModel(
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    var successMessage by mutableStateOf<String?>(null)
-        private set
-
     var isProcessing by mutableStateOf(false)
-        private set
-
-    /** Set after successful sign-up so UI can switch to sign-in with prefilled fields */
-    var registrationResult by mutableStateOf<RegistrationResult?>(null)
         private set
 
     init {
@@ -86,16 +76,12 @@ class AuthViewModel(
         }
         isProcessing = true
         errorMessage = null
-        successMessage = null
         viewModelScope.launch {
             try {
                 supabaseClient.auth.signUpWith(Email) {
                     this.email = email
                     this.password = password
                 }
-                // Signal success — UI will switch to sign-in mode
-                registrationResult = RegistrationResult(email, password)
-                successMessage = "Регистрация прошла успешно! Войдите в аккаунт"
             } catch (e: Exception) {
                 errorMessage = parseError(e)
             } finally {
@@ -104,9 +90,6 @@ class AuthViewModel(
         }
     }
 
-    fun consumeRegistrationResult() {
-        registrationResult = null
-    }
 
     fun signIn(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
@@ -119,7 +102,6 @@ class AuthViewModel(
         }
         isProcessing = true
         errorMessage = null
-        successMessage = null
         viewModelScope.launch {
             try {
                 supabaseClient.auth.signInWith(Email) {
@@ -144,9 +126,8 @@ class AuthViewModel(
         }
     }
 
-    fun clearMessages() {
+    fun clearError() {
         errorMessage = null
-        successMessage = null
     }
 
     private fun parseError(e: Exception): String {

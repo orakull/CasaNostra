@@ -39,20 +39,7 @@ fun AuthScreen(
 
     val isProcessing = viewModel.isProcessing
     val errorMessage = viewModel.errorMessage
-    val successMessage = viewModel.successMessage
     val focusManager = LocalFocusManager.current
-
-    // React to successful registration: switch to sign-in and prefill
-    val registrationResult = viewModel.registrationResult
-    LaunchedEffect(registrationResult) {
-        if (registrationResult != null) {
-            email = registrationResult.email
-            password = registrationResult.password
-            confirmPassword = ""
-            isSignUp = false
-            viewModel.consumeRegistrationResult()
-        }
-    }
 
     Box(
         modifier = modifier
@@ -109,7 +96,7 @@ fun AuthScreen(
                 value = email,
                 onValueChange = {
                     email = it
-                    viewModel.clearMessages()
+                    viewModel.clearError()
                 },
                 label = { Text("Email") },
                 singleLine = true,
@@ -137,7 +124,7 @@ fun AuthScreen(
                 value = password,
                 onValueChange = {
                     password = it
-                    viewModel.clearMessages()
+                    viewModel.clearError()
                 },
                 label = { Text("Пароль") },
                 singleLine = true,
@@ -191,7 +178,7 @@ fun AuthScreen(
                         value = confirmPassword,
                         onValueChange = {
                             confirmPassword = it
-                            viewModel.clearMessages()
+                            viewModel.clearError()
                         },
                         label = { Text("Подтвердите пароль") },
                         singleLine = true,
@@ -221,23 +208,6 @@ fun AuthScreen(
                 }
             }
 
-            // Success message
-            AnimatedVisibility(
-                visible = successMessage != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Text(
-                    text = successMessage ?: "",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp)
-                )
-            }
 
             // Error message
             AnimatedVisibility(
@@ -296,7 +266,7 @@ fun AuthScreen(
                 onClick = {
                     isSignUp = !isSignUp
                     confirmPassword = ""
-                    viewModel.clearMessages()
+                    viewModel.clearError()
                 },
                 enabled = !isProcessing
             ) {
