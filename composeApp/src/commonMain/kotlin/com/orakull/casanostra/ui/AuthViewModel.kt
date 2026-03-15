@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.auth.status.SessionSource
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -20,9 +19,20 @@ sealed class AuthState {
     data object Authenticated : AuthState()
 }
 
+data class RegistrationResult(
+    val email: String,
+    val password: String
+)
+
 class AuthViewModel(
     private val supabaseClient: SupabaseClient
 ) : ViewModel() {
+
+    companion object {
+        private val EMAIL_REGEX = Regex(
+            "^[A-Za-z0-9](?:[A-Za-z0-9._%+-]*[A-Za-z0-9])?@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\\.[A-Za-z]{2,}$"
+        )
+    }
 
     var authState by mutableStateOf<AuthState>(AuthState.Loading)
         private set
@@ -30,7 +40,14 @@ class AuthViewModel(
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
+    var successMessage by mutableStateOf<String?>(null)
+        private set
+
     var isProcessing by mutableStateOf(false)
+        private set
+
+    /** Set after successful sign-up so UI can switch to sign-in with prefilled fields */
+    var registrationResult by mutableStateOf<RegistrationResult?>(null)
         private set
 
     init {
@@ -42,13 +59,7 @@ class AuthViewModel(
             .onEach { status ->
                 authState = when (status) {
                     is SessionStatus.Authenticated -> AuthState.Authenticated
-                    is SessionStatus.NotAuthenticated -> {
-                        if (status.isSignOut) {
-                            AuthState.NotAuthenticated
-                        } else {
-                            AuthState.NotAuthenticated
-                        }
-                    }
+                    is SessionStatus.NotAuthenticated -> AuthState.NotAuthenticated
                     is SessionStatus.Initializing -> AuthState.Loading
                     is SessionStatus.RefreshFailure -> AuthState.NotAuthenticated
                 }
@@ -56,25 +67,35 @@ class AuthViewModel(
             .launchIn(viewModelScope)
     }
 
-    fun signUp(email: String, password: String) {
-        if (email.isBlank() || password.isBlank()) {
+    fun signUp(email: String, password: String, confirmPassword: String) {
+        if (email.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
             errorMessage = "Заполните все поля"
+            return
+        }
+        if (!EMAIL_REGEX.matches(email.trim())) {
+            errorMessage = "Некорректный формат email"
             return
         }
         if (password.length < 6) {
             errorMessage = "Пароль должен быть не менее 6 символов"
             return
         }
+        if (password != confirmPassword) {
+            errorMessage = "Пароли не совпадают"
+            return
+        }
         isProcessing = true
         errorMessage = null
+        successMessage = null
         viewModelScope.launch {
             try {
                 supabaseClient.auth.signUpWith(Email) {
                     this.email = email
                     this.password = password
                 }
-                // After sign up, Supabase auto-confirms if disabled email confirmation
-                // The session status flow will update authState automatically
+                // Signal success — UI will switch to sign-in mode
+                registrationResult = RegistrationResult(email, password)
+                successMessage = "Регистрация прошла успешно! Войдите в аккаунт"
             } catch (e: Exception) {
                 errorMessage = parseError(e)
             } finally {
@@ -83,13 +104,22 @@ class AuthViewModel(
         }
     }
 
+    fun consumeRegistrationResult() {
+        registrationResult = null
+    }
+
     fun signIn(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
             errorMessage = "Заполните все поля"
             return
         }
+        if (!EMAIL_REGEX.matches(email.trim())) {
+            errorMessage = "Некорректный формат email"
+            return
+        }
         isProcessing = true
         errorMessage = null
+        successMessage = null
         viewModelScope.launch {
             try {
                 supabaseClient.auth.signInWith(Email) {
@@ -114,8 +144,9 @@ class AuthViewModel(
         }
     }
 
-    fun clearError() {
+    fun clearMessages() {
         errorMessage = null
+        successMessage = null
     }
 
     private fun parseError(e: Exception): String {
@@ -126,6 +157,7 @@ class AuthViewModel(
             "Email not confirmed" in msg -> "Email не подтверждён. Проверьте почту"
             "network" in msg.lowercase() || "connect" in msg.lowercase() -> "Нет подключения к интернету"
             "Unable to validate email address" in msg -> "Некорректный email"
+            "Email rate limit exceeded" in msg -> "Слишком много попыток. Попробуйте позже"
             else -> msg
         }
     }

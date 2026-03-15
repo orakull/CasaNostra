@@ -33,12 +33,26 @@ fun AuthScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var isSignUp by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     val isProcessing = viewModel.isProcessing
     val errorMessage = viewModel.errorMessage
+    val successMessage = viewModel.successMessage
     val focusManager = LocalFocusManager.current
+
+    // React to successful registration: switch to sign-in and prefill
+    val registrationResult = viewModel.registrationResult
+    LaunchedEffect(registrationResult) {
+        if (registrationResult != null) {
+            email = registrationResult.email
+            password = registrationResult.password
+            confirmPassword = ""
+            isSignUp = false
+            viewModel.consumeRegistrationResult()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -95,7 +109,7 @@ fun AuthScreen(
                 value = email,
                 onValueChange = {
                     email = it
-                    viewModel.clearError()
+                    viewModel.clearMessages()
                 },
                 label = { Text("Email") },
                 singleLine = true,
@@ -123,7 +137,7 @@ fun AuthScreen(
                 value = password,
                 onValueChange = {
                     password = it
-                    viewModel.clearError()
+                    viewModel.clearMessages()
                 },
                 label = { Text("Пароль") },
                 singleLine = true,
@@ -144,13 +158,15 @@ fun AuthScreen(
                 },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
+                    imeAction = if (isSignUp) ImeAction.Next else ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) },
                     onDone = {
-                        focusManager.clearFocus()
-                        if (isSignUp) viewModel.signUp(email, password)
-                        else viewModel.signIn(email, password)
+                        if (!isSignUp) {
+                            focusManager.clearFocus()
+                            viewModel.signIn(email, password)
+                        }
                     }
                 ),
                 shape = RoundedCornerShape(14.dp),
@@ -162,6 +178,66 @@ fun AuthScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isProcessing
             )
+
+            // Confirm password field (only for sign up)
+            AnimatedVisibility(
+                visible = isSignUp,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = {
+                            confirmPassword = it
+                            viewModel.clearMessages()
+                        },
+                        label = { Text("Подтвердите пароль") },
+                        singleLine = true,
+                        visualTransformation = if (passwordVisible)
+                            VisualTransformation.None
+                        else
+                            PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                viewModel.signUp(email, password, confirmPassword)
+                            }
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isProcessing
+                    )
+                }
+            }
+
+            // Success message
+            AnimatedVisibility(
+                visible = successMessage != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Text(
+                    text = successMessage ?: "",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                )
+            }
 
             // Error message
             AnimatedVisibility(
@@ -186,7 +262,7 @@ fun AuthScreen(
             Button(
                 onClick = {
                     focusManager.clearFocus()
-                    if (isSignUp) viewModel.signUp(email, password)
+                    if (isSignUp) viewModel.signUp(email, password, confirmPassword)
                     else viewModel.signIn(email, password)
                 },
                 modifier = Modifier
@@ -219,7 +295,8 @@ fun AuthScreen(
             TextButton(
                 onClick = {
                     isSignUp = !isSignUp
-                    viewModel.clearError()
+                    confirmPassword = ""
+                    viewModel.clearMessages()
                 },
                 enabled = !isProcessing
             ) {
