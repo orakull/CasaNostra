@@ -18,7 +18,11 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
+fun PlayerScreen(
+    viewModel: PlayerViewModel,
+    onLogout: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val isPlaying = viewModel.isPlaying
     val currentPositionMs = viewModel.currentPositionMs
     val durationMs = viewModel.durationMs
@@ -47,7 +51,7 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
-                        AestheticHeader()
+                        AestheticHeader(onLogout = onLogout)
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
@@ -132,7 +136,7 @@ fun PlayerScreen(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun AestheticHeader() {
+private fun AestheticHeader(onLogout: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,10 +144,26 @@ private fun AestheticHeader() {
             .background(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
-            ),
-        contentAlignment = Alignment.Center
+            )
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Logout button in top-right corner
+        IconButton(
+            onClick = onLogout,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ExitToApp,
+                contentDescription = "Выйти",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Box(
                 modifier = Modifier
                     .size(100.dp)

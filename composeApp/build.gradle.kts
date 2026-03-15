@@ -43,6 +43,7 @@ kotlin {
             implementation(libs.media3.exoplayer)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.koin.android)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -65,7 +66,6 @@ kotlin {
             implementation(libs.ktor.client.core)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
-            implementation(libs.koin.compose.viewmodel)
         }
         val iosMain by creating {
             dependsOn(commonMain.get())
