@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import casanostra.composeapp.generated.resources.Res
 import com.orakull.casanostra.audio.TrackInfo
+import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.ui.*
 import io.github.jan.supabase.SupabaseClient
 import kotlinx.coroutines.launch
@@ -64,31 +65,57 @@ fun App() {
                 }
 
                 is AuthState.Authenticated -> {
-                    val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel() }
-                    val scope = rememberCoroutineScope()
-
-                    LaunchedEffect(Unit) {
-                        scope.launch {
-                            val trackFiles = listOf(
-                                "files/bass_vocals.wav" to "Бас (Вокал)",
-                                "files/tenor_piano.wav" to "Тенор (Фортепиано)",
-                                "files/tenor_vocals.wav" to "Тенор (Вокал)"
+                    var currentScreen by remember { mutableStateOf("projects") }
+                    var selectedProject by remember { mutableStateOf<Project?>(null) }
+                    
+                    AnimatedContent(
+                        targetState = currentScreen,
+                        transitionSpec = {
+                            if (targetState == "player") {
+                                slideInHorizontally { width -> width } + fadeIn() togetherWith slideOutHorizontally { width -> -width } + fadeOut()
+                            } else {
+                                slideInHorizontally { width -> -width } + fadeIn() togetherWith slideOutHorizontally { width -> width } + fadeOut()
+                            }
+                        }
+                    ) { screen ->
+                        if (screen == "projects") {
+                            val projectsViewModel: ProjectsViewModel = viewModel { ProjectsViewModel(supabaseClient) }
+                            ProjectsScreen(
+                                viewModel = projectsViewModel,
+                                onProjectSelected = { project -> 
+                                    selectedProject = project
+                                    currentScreen = "player" 
+                                },
+                                onLogout = { authViewModel.signOut() }
                             )
+                        } else if (screen == "player") {
+                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel() }
+                            val scope = rememberCoroutineScope()
+                            
+                            LaunchedEffect(selectedProject) {
+                                scope.launch {
+                                    val trackFiles = listOf(
+                                        "files/bass_vocals.wav" to "Бас (Вокал)",
+                                        "files/tenor_piano.wav" to "Тенор (Фортепиано)",
+                                        "files/tenor_vocals.wav" to "Тенор (Вокал)"
+                                    )
 
-                            val trackInfos = trackFiles.map { (path, name) ->
-                                val bytes = Res.readBytes(path)
-                                TrackInfo(name = name, resourceBytes = bytes)
+                                    val trackInfos = trackFiles.map { (path, name) ->
+                                        val bytes = Res.readBytes(path)
+                                        TrackInfo(name = name, resourceBytes = bytes)
+                                    }
+
+                                    playerViewModel.loadTracks(trackInfos)
+                                }
                             }
 
-                            playerViewModel.loadTracks(trackInfos)
+                            PlayerScreen(
+                                viewModel = playerViewModel,
+                                onBack = { currentScreen = "projects" },
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
-
-                    PlayerScreen(
-                        viewModel = playerViewModel,
-                        onLogout = { authViewModel.signOut() },
-                        modifier = Modifier.fillMaxSize()
-                    )
                 }
             }
         }

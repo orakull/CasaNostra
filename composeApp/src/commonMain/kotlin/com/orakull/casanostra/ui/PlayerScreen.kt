@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +21,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
-    onLogout: () -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LockScreenOrientation(ScreenOrientation.Unspecified)
@@ -53,7 +54,7 @@ fun PlayerScreen(
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
-                        AestheticHeader(onLogout = onLogout)
+                        AestheticHeader(onBack = onBack)
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
@@ -138,7 +139,7 @@ fun PlayerScreen(
 }
 
 @Composable
-private fun AestheticHeader(onLogout: () -> Unit = {}) {
+private fun AestheticHeader(onBack: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,16 +149,16 @@ private fun AestheticHeader(onLogout: () -> Unit = {}) {
                 shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
             )
     ) {
-        // Logout button in top-right corner
+        // Back button in top-left corner
         IconButton(
-            onClick = onLogout,
+            onClick = onBack,
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopStart)
                 .padding(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Filled.ExitToApp,
-                contentDescription = "Выйти",
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Назад к проектам",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
