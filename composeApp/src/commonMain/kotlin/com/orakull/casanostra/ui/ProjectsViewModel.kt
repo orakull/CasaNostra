@@ -24,6 +24,12 @@ class ProjectsViewModel(
     var state by mutableStateOf<ProjectsState>(ProjectsState.Loading)
         private set
 
+    val currentUserEmail: String?
+        get() = supabaseClient.auth.currentUserOrNull()?.email
+
+    val currentUserId: String?
+        get() = supabaseClient.auth.currentUserOrNull()?.id
+
     init {
         loadProjects()
     }

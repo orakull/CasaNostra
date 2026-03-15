@@ -45,7 +45,10 @@ fun ProjectsScreen(
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             item {
-                AestheticProjectsHeader(onLogout = onLogout)
+                AestheticProjectsHeader(
+                    userEmail = viewModel.currentUserEmail ?: "Пользователь",
+                    onLogout = onLogout
+                )
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
@@ -162,7 +165,7 @@ private fun ProjectItem(project: Project, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AestheticProjectsHeader(onLogout: () -> Unit) {
+private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,7 +203,7 @@ private fun AestheticProjectsHeader(onLogout: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Casa Nostra",
+                text = userEmail,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground

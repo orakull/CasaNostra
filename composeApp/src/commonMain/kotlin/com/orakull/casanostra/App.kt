@@ -111,6 +111,7 @@ fun App() {
 
                             PlayerScreen(
                                 viewModel = playerViewModel,
+                                projectName = selectedProject?.name ?: "Проект",
                                 onBack = { currentScreen = "projects" },
                                 modifier = Modifier.fillMaxSize()
                             )

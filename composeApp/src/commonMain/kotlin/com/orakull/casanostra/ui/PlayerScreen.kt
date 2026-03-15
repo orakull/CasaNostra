@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
+    projectName: String,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -54,7 +55,10 @@ fun PlayerScreen(
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
-                        AestheticHeader(onBack = onBack)
+                        AestheticHeader(
+                            projectName = projectName,
+                            onBack = onBack
+                        )
                         Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
@@ -139,7 +143,7 @@ fun PlayerScreen(
 }
 
 @Composable
-private fun AestheticHeader(onBack: () -> Unit = {}) {
+private fun AestheticHeader(projectName: String, onBack: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,7 +190,7 @@ private fun AestheticHeader(onBack: () -> Unit = {}) {
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Casa Nostra",
+                text = projectName,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground
