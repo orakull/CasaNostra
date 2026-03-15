@@ -81,7 +81,8 @@ fun App() {
                     ) { screen ->
                         if (screen == "projects") {
                             val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
-                            val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(supabaseClient) }
+                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
+                            val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(repository, supabaseClient) }
                             ProjectsScreen(
                                 viewModel = projectsViewModel,
                                 onProjectSelected = { project -> 
@@ -91,10 +92,12 @@ fun App() {
                                 onLogout = { authViewModel.signOut() }
                             )
                         } else if (screen == "player") {
-                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel() }
+                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
+                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository) }
                             val scope = rememberCoroutineScope()
                             
                             LaunchedEffect(selectedProject) {
+                                selectedProject?.let { playerViewModel.setProject(it) }
                                 scope.launch {
                                     val trackFiles = listOf(
                                         "files/bass_vocals.wav" to "Бас (Вокал)",
@@ -113,7 +116,6 @@ fun App() {
 
                             PlayerScreen(
                                 viewModel = playerViewModel,
-                                projectName = selectedProject?.name ?: "Проект",
                                 onBack = { currentScreen = "projects" },
                                 modifier = Modifier.fillMaxSize()
                             )

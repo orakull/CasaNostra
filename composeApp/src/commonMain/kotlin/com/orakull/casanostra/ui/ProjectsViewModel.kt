@@ -8,8 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.orakull.casanostra.data.models.Project
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.launch
+import com.orakull.casanostra.data.repository.ProjectRepository
 
 sealed class ProjectsState {
     data object Loading : ProjectsState()
@@ -18,6 +18,7 @@ sealed class ProjectsState {
 }
 
 class ProjectsViewModel(
+    private val repository: ProjectRepository,
     private val supabaseClient: SupabaseClient
 ) : ViewModel() {
 
@@ -34,6 +35,14 @@ class ProjectsViewModel(
         get() = supabaseClient.auth.currentUserOrNull()?.id
 
     init {
+        viewModelScope.launch {
+            repository.projects.collect { projects ->
+                // Если данные загрузились успешно
+                if (state !is ProjectsState.Error || projects.isNotEmpty()) {
+                    state = ProjectsState.Success(projects)
+                }
+            }
+        }
         loadProjects()
     }
 
@@ -47,11 +56,7 @@ class ProjectsViewModel(
                     return@launch
                 }
 
-                val projects = supabaseClient.postgrest["projects"]
-                    .select()
-                    .decodeList<Project>()
-
-                state = ProjectsState.Success(projects)
+                repository.fetchProjects(userId)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
             }
@@ -63,17 +68,13 @@ class ProjectsViewModel(
         viewModelScope.launch {
             isRefreshing = true
             try {
-                val userId = supabaseClient.auth.currentUserOrNull()?.id
+                val userId = currentUserId
                 if (userId == null) {
                     state = ProjectsState.Error("Пользователь не авторизован")
                     return@launch
                 }
 
-                val projects = supabaseClient.postgrest["projects"]
-                    .select()
-                    .decodeList<Project>()
-
-                state = ProjectsState.Success(projects)
+                repository.fetchProjects(userId)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
             } finally {
@@ -87,22 +88,8 @@ class ProjectsViewModel(
 
         viewModelScope.launch {
             try {
-                val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@launch
-
-                val newProject = Project(
-                    name = name,
-                    ownerId = userId
-                )
-
-                supabaseClient.postgrest["projects"]
-                    .insert(newProject)
-
-                // Refresh list using the same suspend function
-                val updatedProjects = supabaseClient.postgrest["projects"]
-                    .select()
-                    .decodeList<Project>()
-
-                state = ProjectsState.Success(updatedProjects)
+                val userId = currentUserId ?: return@launch
+                repository.createProject(name, userId)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Ошибка создания проекта")
             }

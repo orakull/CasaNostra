@@ -18,4 +18,6 @@ val supabaseModule = module {
             install(Storage)
         }
     }
+    
+    single { com.orakull.casanostra.data.repository.ProjectRepository(get()) }
 }

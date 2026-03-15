@@ -16,12 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
-    projectName: String,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -32,6 +34,9 @@ fun PlayerScreen(
     val durationMs = viewModel.durationMs
     val tracks = viewModel.tracks
     val isLoaded = viewModel.isLoaded
+    val project by viewModel.project.collectAsState()
+    
+    var isEditingName by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -56,8 +61,9 @@ fun PlayerScreen(
                 if (!isLandscape) {
                     item {
                         AestheticHeader(
-                            projectName = projectName,
-                            onBack = onBack
+                            projectName = project?.name ?: "Проект",
+                            onBack = onBack,
+                            onRenameClick = { isEditingName = true }
                         )
                         Spacer(modifier = Modifier.height(32.dp))
                     }
@@ -137,13 +143,55 @@ fun PlayerScreen(
                     )
                 }
             }
-            }
         }
+    }
+
+    if (isEditingName) {
+        var newName by remember { mutableStateOf(project?.name ?: "") }
+        val focusRequester = remember { FocusRequester() }
+
+        AlertDialog(
+            onDismissRequest = { isEditingName = false },
+            title = { Text("Переименовать проект") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Название") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.focusRequester(focusRequester)
+                )
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newName.isNotBlank()) {
+                        viewModel.renameProject(newName)
+                        isEditingName = false
+                    }
+                }) {
+                    Text("Сохранить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isEditingName = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
     }
 }
 
 @Composable
-private fun AestheticHeader(projectName: String, onBack: () -> Unit = {}) {
+private fun AestheticHeader(
+    projectName: String, 
+    onBack: () -> Unit,
+    onRenameClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -189,12 +237,22 @@ private fun AestheticHeader(projectName: String, onBack: () -> Unit = {}) {
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = projectName,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            OutlinedButton(
+                onClick = onRenameClick,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                border = null,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = projectName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Мультитрек-Сессия",
