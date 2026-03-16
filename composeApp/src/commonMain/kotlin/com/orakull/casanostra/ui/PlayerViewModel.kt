@@ -41,14 +41,30 @@ class PlayerViewModel(
     // Expose tracks from repository
     val projectTracks: StateFlow<List<ProjectTrack>> = trackRepository.tracks
 
+    var isUploading by mutableStateOf(false)
+        private set
+
+    var uploadError by mutableStateOf<String?>(null)
+        private set
+
     fun setProject(project: com.orakull.casanostra.data.models.Project) {
         _project.value = project
+        tracks.clear()
+        player.release()
+        isLoaded = false
+        
         viewModelScope.launch {
-            trackRepository.fetchTracks(project.id)
-            trackRepository.tracks.collect { repoTracks ->
-                if (repoTracks.isNotEmpty() && !isLoaded) {
+            try {
+                trackRepository.fetchTracks(project.id)
+                val repoTracks = trackRepository.tracks.value
+                if (repoTracks.isEmpty()) {
+                    isLoaded = true
+                } else {
                     loadProjectTracksIntoPlayer(repoTracks)
                 }
+            } catch (e: Exception) {
+                println("SET_PROJECT_ERROR: ${e.message}")
+                isLoaded = true // Stop loader even on error
             }
         }
     }
@@ -114,11 +130,20 @@ class PlayerViewModel(
         val project = _project.value ?: return
         viewModelScope.launch {
             try {
+                isUploading = true
+                uploadError = null
                 val bytes = file.readBytes()
                 trackRepository.uploadTrack(project.id, file.name, bytes)
+                
+                // After successful upload, reload player tracks to include the new one
+                val updatedTracks = trackRepository.tracks.value
+                loadProjectTracksIntoPlayer(updatedTracks)
             } catch (e: Exception) {
                 println("UPLOAD_ERROR: ${e::class.simpleName}: ${e.message}")
+                uploadError = "Ошибка загрузки: ${e.message}"
                 e.printStackTrace()
+            } finally {
+                isUploading = false
             }
         }
     }
@@ -127,8 +152,10 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 trackRepository.deleteTrack(trackId, filePath)
+                // Reload all tracks to sync with player state
+                loadProjectTracksIntoPlayer(trackRepository.tracks.value)
             } catch (e: Exception) {
-                // Handle error
+                println("DELETE_TRACK_ERROR: ${e.message}")
             }
         }
     }
@@ -137,8 +164,13 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 trackRepository.renameTrack(trackId, newName)
+                // Sync with local state list
+                val index = trackRepository.tracks.value.indexOfFirst { it.id == trackId }
+                if (index != -1 && index < tracks.size) {
+                    tracks[index] = tracks[index].copy(name = newName)
+                }
             } catch (e: Exception) {
-                // Handle error
+                println("RENAME_TRACK_ERROR: ${e.message}")
             }
         }
     }

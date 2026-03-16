@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.core.PickerType
@@ -39,6 +40,8 @@ fun PlayerScreen(
     val isLoaded = viewModel.isLoaded
     val project by viewModel.project.collectAsState()
     val projectTracks by viewModel.projectTracks.collectAsState()
+    val isUploading = viewModel.isUploading
+    val uploadError = viewModel.uploadError
     
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -73,11 +76,10 @@ fun PlayerScreen(
             }
         },
         modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
-    ) { paddingValues ->
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(paddingValues)
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
     ) {
@@ -92,7 +94,7 @@ fun PlayerScreen(
                 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(bottom = 24.dp) // Space for FAB
                 ) {
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
@@ -162,6 +164,37 @@ fun PlayerScreen(
                                     onStop = { viewModel.stop() },
                                     isLoaded = isLoaded,
                                     modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (tracks.isEmpty() && isLoaded) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillParentMaxWidth()
+                                .height(300.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Filled.LibraryMusic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "В проекте пока нет дорожек",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Нажмите + чтобы добавить аудио",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -337,6 +370,32 @@ fun PlayerScreen(
     }
 
     } // End Column
+
+    // Uploading Indicator Overlay
+    if (isUploading) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.Black.copy(alpha = 0.5f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Загрузка файла...", color = Color.White)
+                }
+            }
+        }
+    }
+
+    // Error Snackbar/Toast
+    LaunchedEffect(uploadError) {
+        uploadError?.let {
+            // In a real app we'd use SnackbarHostState, 
+            // but for simple MVP let's just log or show a simple overlay if needed.
+            println("UI_ERROR: $it")
+        }
+    }
+
     } // End Scaffold
 } // End PlayerScreen
 
