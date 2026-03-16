@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import androidx.lifecycle.viewModelScope
 import com.orakull.casanostra.data.repository.ProjectRepository
+import com.orakull.casanostra.data.repository.TrackRepository
 import com.orakull.casanostra.data.models.Project
+import com.orakull.casanostra.data.models.ProjectTrack
 import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
 import kotlinx.coroutines.launch
@@ -28,13 +30,73 @@ data class TrackState(
     val color: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent
 )
 
-class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
+class PlayerViewModel(
+    private val repository: ProjectRepository,
+    private val trackRepository: TrackRepository
+) : ViewModel() {
 
     private val _project = MutableStateFlow<Project?>(null)
     val project: StateFlow<Project?> = _project.asStateFlow()
 
-    fun setProject(project: Project) {
+    // Expose tracks from repository
+    val projectTracks: StateFlow<List<ProjectTrack>> = trackRepository.tracks
+
+    var isUploading by mutableStateOf(false)
+        private set
+
+    var uploadError by mutableStateOf<String?>(null)
+        private set
+
+    fun setProject(project: com.orakull.casanostra.data.models.Project) {
         _project.value = project
+        tracks.clear()
+        player.release()
+        isLoaded = false
+        
+        viewModelScope.launch {
+            try {
+                trackRepository.fetchTracks(project.id)
+                val repoTracks = trackRepository.tracks.value
+                if (repoTracks.isEmpty()) {
+                    isLoaded = true
+                } else {
+                    loadProjectTracksIntoPlayer(repoTracks)
+                }
+            } catch (e: Exception) {
+                println("SET_PROJECT_ERROR: ${e.message}")
+                isLoaded = true // Stop loader even on error
+            }
+        }
+    }
+
+    private fun loadProjectTracksIntoPlayer(projectTracks: List<com.orakull.casanostra.data.models.ProjectTrack>) {
+        viewModelScope.launch {
+            try {
+                isLoaded = false
+                val trackInfos = projectTracks.map { pt ->
+                    val bytes = trackRepository.downloadTrackBytes(pt.filePath)
+                    com.orakull.casanostra.audio.TrackInfo(name = pt.name, resourceBytes = bytes)
+                }
+                
+                player.loadTracks(trackInfos)
+
+                tracks.clear()
+                projectTracks.forEachIndexed { index, pt ->
+                    tracks.add(
+                        TrackState(
+                            name = pt.name,
+                            color = trackColorPool[index % trackColorPool.size]
+                        )
+                    )
+                }
+
+                durationMs = player.getDurationMs()
+                isLoaded = true
+            } catch (e: Exception) {
+                println("LOAD_TRACKS_ERROR: ${e.message}")
+                e.printStackTrace()
+            }
+        }
     }
 
     fun renameProject(newName: String) {
@@ -60,6 +122,55 @@ class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
                 onSuccess()
             } catch (e: Exception) {
                 // Handle error if needed
+            }
+        }
+    }
+
+    fun uploadAudio(file: io.github.vinceglb.filekit.core.PlatformFile) {
+        val project = _project.value ?: return
+        viewModelScope.launch {
+            try {
+                isUploading = true
+                uploadError = null
+                val bytes = file.readBytes()
+                trackRepository.uploadTrack(project.id, file.name, bytes)
+                
+                // After successful upload, reload player tracks to include the new one
+                val updatedTracks = trackRepository.tracks.value
+                loadProjectTracksIntoPlayer(updatedTracks)
+            } catch (e: Exception) {
+                println("UPLOAD_ERROR: ${e::class.simpleName}: ${e.message}")
+                uploadError = "Ошибка загрузки: ${e.message}"
+                e.printStackTrace()
+            } finally {
+                isUploading = false
+            }
+        }
+    }
+
+    fun deleteTrack(trackId: String, filePath: String) {
+        viewModelScope.launch {
+            try {
+                trackRepository.deleteTrack(trackId, filePath)
+                // Reload all tracks to sync with player state
+                loadProjectTracksIntoPlayer(trackRepository.tracks.value)
+            } catch (e: Exception) {
+                println("DELETE_TRACK_ERROR: ${e.message}")
+            }
+        }
+    }
+
+    fun renameTrack(trackId: String, newName: String) {
+        viewModelScope.launch {
+            try {
+                trackRepository.renameTrack(trackId, newName)
+                // Sync with local state list
+                val index = trackRepository.tracks.value.indexOfFirst { it.id == trackId }
+                if (index != -1 && index < tracks.size) {
+                    tracks[index] = tracks[index].copy(name = newName)
+                }
+            } catch (e: Exception) {
+                println("RENAME_TRACK_ERROR: ${e.message}")
             }
         }
     }
@@ -96,14 +207,13 @@ class PlayerViewModel(private val repository: ProjectRepository) : ViewModel() {
     )
 
     fun loadTracks(trackInfos: List<TrackInfo>) {
-        val trackNames = listOf("Бас (Вокал)", "Тенор (Фортепиано)", "Тенор (Вокал)")
         player.loadTracks(trackInfos)
 
         tracks.clear()
-        trackInfos.forEachIndexed { index, _ ->
+        trackInfos.forEachIndexed { index, info ->
             tracks.add(
                 TrackState(
-                    name = trackNames.getOrElse(index) { "Дорожка ${index + 1}" },
+                    name = info.name,
                     color = trackColorPool[index % trackColorPool.size]
                 )
             )

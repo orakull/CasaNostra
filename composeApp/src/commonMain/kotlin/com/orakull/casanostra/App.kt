@@ -96,25 +96,12 @@ fun App() {
                             )
                         } else if (screen == "player") {
                             val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
-                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository) }
+                            val trackRepository = koinInject<com.orakull.casanostra.data.repository.TrackRepository>()
+                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository, trackRepository) }
                             val scope = rememberCoroutineScope()
                             
                             LaunchedEffect(selectedProject) {
                                 selectedProject?.let { playerViewModel.setProject(it) }
-                                scope.launch {
-                                    val trackFiles = listOf(
-                                        "files/bass_vocals.wav" to "Бас (Вокал)",
-                                        "files/tenor_piano.wav" to "Тенор (Фортепиано)",
-                                        "files/tenor_vocals.wav" to "Тенор (Вокал)"
-                                    )
-
-                                    val trackInfos = trackFiles.map { (path, name) ->
-                                        val bytes = Res.readBytes(path)
-                                        TrackInfo(name = name, resourceBytes = bytes)
-                                    }
-
-                                    playerViewModel.loadTracks(trackInfos)
-                                }
                             }
 
                             PlayerScreen(

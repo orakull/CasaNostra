@@ -19,7 +19,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.core.PickerType
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -36,12 +39,46 @@ fun PlayerScreen(
     val tracks = viewModel.tracks
     val isLoaded = viewModel.isLoaded
     val project by viewModel.project.collectAsState()
+    val projectTracks by viewModel.projectTracks.collectAsState()
+    val isUploading = viewModel.isUploading
+    val uploadError = viewModel.uploadError
     
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
+    // Track Editing State
+    var selectedTrackId by remember { mutableStateOf<String?>(null) }
+    var selectedTrackFilePath by remember { mutableStateOf<String?>(null) }
+    var showTrackEditDialog by remember { mutableStateOf(false) }
+    var showTrackDeleteDialog by remember { mutableStateOf(false) }
+
+    // FileKit Launcher
+    val filePickerLauncher = rememberFilePickerLauncher(
+        type = PickerType.File(extensions = listOf("wav", "mp3")),
+        title = "Выберите аудиофайл"
+    ) { file ->
+        file?.let {
+            // Because reading file bytes can be blocking/suspend, 
+            // the actual reading and uploading happens cleanly in Coroutine.
+            viewModel.uploadAudio(it)
+        }
+    }
+
+    Scaffold(
+        floatingActionButton = {
+            if (isLoaded) {
+                FloatingActionButton(
+                    onClick = { filePickerLauncher.launch() },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Добавить дорожку")
+                }
+            }
+        },
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+    ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .systemBarsPadding()
@@ -57,7 +94,7 @@ fun PlayerScreen(
                 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp)
+                    contentPadding = PaddingValues(bottom = 24.dp) // Space for FAB
                 ) {
                 // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
@@ -133,6 +170,37 @@ fun PlayerScreen(
                     }
                 }
 
+                if (tracks.isEmpty() && isLoaded) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillParentMaxWidth()
+                                .height(300.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.Filled.LibraryMusic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "В проекте пока нет дорожек",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Нажмите + чтобы добавить аудио",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Tracks
                 item { Spacer(modifier = Modifier.height(16.dp)) }
                 
@@ -142,7 +210,15 @@ fun PlayerScreen(
                         index = index,
                         onVolumeChange = { volume -> viewModel.setVolume(index, volume) },
                         onMuteToggle = { viewModel.toggleMute(index) },
-                        onSoloToggle = { viewModel.toggleSolo(index) }
+                        onSoloToggle = { viewModel.toggleSolo(index) },
+                        onTrackClick = {
+                            val dbTrack = projectTracks.getOrNull(index)
+                            if (dbTrack != null) {
+                                selectedTrackId = dbTrack.id
+                                selectedTrackFilePath = dbTrack.filePath
+                                showTrackEditDialog = true
+                            }
+                        }
                     )
                 }
             }
@@ -210,8 +286,118 @@ fun PlayerScreen(
             }
         )
     }
+
+    if (showTrackEditDialog && selectedTrackId != null) {
+        val currentTrackName = projectTracks.find { it.id == selectedTrackId }?.name ?: ""
+        var newTrackName by remember { mutableStateOf(currentTrackName) }
+        val focusRequester = remember { FocusRequester() }
+
+        AlertDialog(
+            onDismissRequest = { showTrackEditDialog = false },
+            title = { Text("Опции Трека") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = newTrackName,
+                        onValueChange = { newTrackName = it },
+                        label = { Text("Название") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.focusRequester(focusRequester).fillMaxWidth()
+                    )
+                    LaunchedEffect(Unit) {
+                        focusRequester.requestFocus()
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showTrackEditDialog = false
+                            showTrackDeleteDialog = true
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Удалить трек")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Удалить трек из проекта")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newTrackName.isNotBlank() && newTrackName != currentTrackName) {
+                        viewModel.renameTrack(selectedTrackId!!, newTrackName)
+                    }
+                    showTrackEditDialog = false
+                }) {
+                    Text("Сохранить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrackEditDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
-}
+
+    if (showTrackDeleteDialog && selectedTrackId != null && selectedTrackFilePath != null) {
+        AlertDialog(
+            onDismissRequest = { showTrackDeleteDialog = false },
+            title = { Text("Удалить трек?") },
+            text = { Text("Этот трек и аудиофайл будут удалены безвозвратно.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteTrack(selectedTrackId!!, selectedTrackFilePath!!)
+                        showTrackDeleteDialog = false
+                        selectedTrackId = null
+                        selectedTrackFilePath = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Удалить")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTrackDeleteDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    } // End Column
+
+    // Uploading Indicator Overlay
+    if (isUploading) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.Black.copy(alpha = 0.5f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Загрузка файла...", color = Color.White)
+                }
+            }
+        }
+    }
+
+    // Error Snackbar/Toast
+    LaunchedEffect(uploadError) {
+        uploadError?.let {
+            // In a real app we'd use SnackbarHostState, 
+            // but for simple MVP let's just log or show a simple overlay if needed.
+            println("UI_ERROR: $it")
+        }
+    }
+
+    } // End Scaffold
+} // End PlayerScreen
 
 @Composable
 private fun AestheticHeader(
