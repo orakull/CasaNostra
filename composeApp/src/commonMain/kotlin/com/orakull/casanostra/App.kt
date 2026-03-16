@@ -102,20 +102,6 @@ fun App() {
                             
                             LaunchedEffect(selectedProject) {
                                 selectedProject?.let { playerViewModel.setProject(it) }
-                                scope.launch {
-                                    val trackFiles = listOf(
-                                        "files/bass_vocals.wav" to "Бас (Вокал)",
-                                        "files/tenor_piano.wav" to "Тенор (Фортепиано)",
-                                        "files/tenor_vocals.wav" to "Тенор (Вокал)"
-                                    )
-
-                                    val trackInfos = trackFiles.map { (path, name) ->
-                                        val bytes = Res.readBytes(path)
-                                        TrackInfo(name = name, resourceBytes = bytes)
-                                    }
-
-                                    playerViewModel.loadTracks(trackInfos)
-                                }
                             }
 
                             PlayerScreen(

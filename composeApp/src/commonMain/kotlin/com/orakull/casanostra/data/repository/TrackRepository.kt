@@ -103,6 +103,11 @@ class TrackRepository(private val supabaseClient: SupabaseClient) {
         }
     }
 
+    suspend fun downloadTrackBytes(filePath: String): ByteArray {
+        val bucket = supabaseClient.storage["tracks"]
+        return bucket.downloadPublic(filePath)
+    }
+
     fun clearTracks() {
         _tracks.value = emptyList()
     }

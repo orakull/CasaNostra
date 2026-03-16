@@ -41,10 +41,45 @@ class PlayerViewModel(
     // Expose tracks from repository
     val projectTracks: StateFlow<List<ProjectTrack>> = trackRepository.tracks
 
-    fun setProject(project: Project) {
+    fun setProject(project: com.orakull.casanostra.data.models.Project) {
         _project.value = project
         viewModelScope.launch {
             trackRepository.fetchTracks(project.id)
+            trackRepository.tracks.collect { repoTracks ->
+                if (repoTracks.isNotEmpty() && !isLoaded) {
+                    loadProjectTracksIntoPlayer(repoTracks)
+                }
+            }
+        }
+    }
+
+    private fun loadProjectTracksIntoPlayer(projectTracks: List<com.orakull.casanostra.data.models.ProjectTrack>) {
+        viewModelScope.launch {
+            try {
+                isLoaded = false
+                val trackInfos = projectTracks.map { pt ->
+                    val bytes = trackRepository.downloadTrackBytes(pt.filePath)
+                    com.orakull.casanostra.audio.TrackInfo(name = pt.name, resourceBytes = bytes)
+                }
+                
+                player.loadTracks(trackInfos)
+
+                tracks.clear()
+                projectTracks.forEachIndexed { index, pt ->
+                    tracks.add(
+                        TrackState(
+                            name = pt.name,
+                            color = trackColorPool[index % trackColorPool.size]
+                        )
+                    )
+                }
+
+                durationMs = player.getDurationMs()
+                isLoaded = true
+            } catch (e: Exception) {
+                println("LOAD_TRACKS_ERROR: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
@@ -140,14 +175,13 @@ class PlayerViewModel(
     )
 
     fun loadTracks(trackInfos: List<TrackInfo>) {
-        val trackNames = listOf("Бас (Вокал)", "Тенор (Фортепиано)", "Тенор (Вокал)")
         player.loadTracks(trackInfos)
 
         tracks.clear()
-        trackInfos.forEachIndexed { index, _ ->
+        trackInfos.forEachIndexed { index, info ->
             tracks.add(
                 TrackState(
-                    name = trackNames.getOrElse(index) { "Дорожка ${index + 1}" },
+                    name = info.name,
                     color = trackColorPool[index % trackColorPool.size]
                 )
             )
