@@ -1,5 +1,8 @@
 package com.orakull.casanostra.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,13 +18,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -41,7 +48,6 @@ fun PlayerScreen(
     val project by viewModel.project.collectAsState()
     val projectTracks by viewModel.projectTracks.collectAsState()
     val isUploading = viewModel.isUploading
-    val uploadError = viewModel.uploadError
     
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
@@ -52,15 +58,14 @@ fun PlayerScreen(
     var showTrackEditDialog by remember { mutableStateOf(false) }
     var showTrackDeleteDialog by remember { mutableStateOf(false) }
 
-    // FileKit Launcher
+    // FileKit Launcher — multi-select mode
     val filePickerLauncher = rememberFilePickerLauncher(
         type = PickerType.File(extensions = listOf("wav", "mp3")),
-        title = "Выберите аудиофайл"
-    ) { file ->
-        file?.let {
-            // Because reading file bytes can be blocking/suspend, 
-            // the actual reading and uploading happens cleanly in Coroutine.
-            viewModel.uploadAudio(it)
+        mode = PickerMode.Multiple(),
+        title = "Выберите аудиофайлы"
+    ) { files ->
+        files?.takeIf { it.isNotEmpty() }?.let {
+            viewModel.uploadMultipleAudio(it)
         }
     }
 
@@ -371,29 +376,13 @@ fun PlayerScreen(
 
     } // End Column
 
-    // Uploading Indicator Overlay
+    // Upload Progress Overlay
     if (isUploading) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.Black.copy(alpha = 0.5f)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color.White)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Загрузка файла...", color = Color.White)
-                }
-            }
-        }
-    }
-
-    // Error Snackbar/Toast
-    LaunchedEffect(uploadError) {
-        uploadError?.let {
-            // In a real app we'd use SnackbarHostState, 
-            // but for simple MVP let's just log or show a simple overlay if needed.
-            println("UI_ERROR: $it")
-        }
+        UploadProgressOverlay(
+            uploadItems = viewModel.uploadItems,
+            onRetry = { viewModel.retryFailedUploads() },
+            onDismiss = { viewModel.dismissUploadOverlay() }
+        )
     }
 
     } // End Scaffold
@@ -634,4 +623,203 @@ private fun formatTime(ms: Long): String {
     val seconds = totalSeconds % 60
     val secStr = if (seconds < 10) "0$seconds" else "$seconds"
     return "$minutes:$secStr"
+}
+
+@Composable
+private fun UploadProgressOverlay(
+    uploadItems: List<UploadItemState>,
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hasErrors = uploadItems.any { it.status == UploadStatus.ERROR }
+    val allDone = uploadItems.isNotEmpty() && uploadItems.all { it.status == UploadStatus.DONE }
+    val isStillUploading = uploadItems.any { it.status == UploadStatus.UPLOADING || it.status == UploadStatus.PENDING }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.72f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight(),
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Text(
+                    text = when {
+                        allDone -> "Загрузка завершена ✓"
+                        hasErrors && !isStillUploading -> "Ошибка загрузки"
+                        else -> "Загрузка дорожек..."
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        allDone -> MaterialTheme.colorScheme.primary
+                        hasErrors && !isStillUploading -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Track list
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    uploadItems.forEachIndexed { _, item ->
+                        UploadTrackCard(item = item)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Action buttons
+                if (hasErrors && !isStillUploading) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Отмена")
+                        }
+                        Button(
+                            onClick = onRetry,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Retry")
+                        }
+                    }
+                } else if (!isStillUploading) {
+                    // All done — auto-dismiss via ViewModel, but still show close
+                    TextButton(onClick = onDismiss) {
+                        Text("Закрыть")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UploadTrackCard(item: UploadItemState) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = item.progress,
+        animationSpec = tween(durationMillis = 400),
+        label = "upload_progress"
+    )
+    val trackColor by animateColorAsState(
+        targetValue = when (item.status) {
+            UploadStatus.DONE -> MaterialTheme.colorScheme.primary
+            UploadStatus.ERROR -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.tertiary
+        },
+        animationSpec = tween(300),
+        label = "track_color"
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Status icon
+            when (item.status) {
+                UploadStatus.PENDING, UploadStatus.UPLOADING -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
+                UploadStatus.DONE -> {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                UploadStatus.ERROR -> {
+                    Icon(
+                        Icons.Filled.Error,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            // File info + progress bar
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.file.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (item.status != UploadStatus.DONE) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = trackColor,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                }
+                // Error message
+                if (item.status == UploadStatus.ERROR && item.errorMessage != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.errorMessage,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Percentage text
+            Text(
+                text = when (item.status) {
+                    UploadStatus.DONE -> "OK"
+                    UploadStatus.ERROR -> "ERR"
+                    else -> "${(item.progress * 100).toInt()}%"
+                },
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = trackColor,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
