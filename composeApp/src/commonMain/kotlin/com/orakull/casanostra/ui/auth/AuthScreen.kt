@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.auth
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -108,11 +107,7 @@ fun AuthScreen(
                     onNext = { focusManager.moveFocus(FocusDirection.Down) }
                 ),
                 shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
-                ),
+                colors = authTextFieldColors(),
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isProcessing
             )
@@ -157,11 +152,7 @@ fun AuthScreen(
                     }
                 ),
                 shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary
-                ),
+                colors = authTextFieldColors(),
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isProcessing
             )
@@ -197,17 +188,12 @@ fun AuthScreen(
                             }
                         ),
                         shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedLabelColor = MaterialTheme.colorScheme.primary
-                        ),
+                        colors = authTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isProcessing
                     )
                 }
             }
-
 
             // Error message
             AnimatedVisibility(
@@ -279,3 +265,10 @@ fun AuthScreen(
         }
     }
 }
+
+@Composable
+private fun authTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedLabelColor = MaterialTheme.colorScheme.primary
+)

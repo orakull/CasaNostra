@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.projects
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,8 +60,8 @@ class ProjectsViewModel(
                 }
 
                 repository.fetchProjects(userId)
-                
-                // Гарантируем, что после запроса стейт станет Success, 
+
+                // Гарантируем, что после запроса стейт станет Success,
                 // даже если StateFlow не заэмитил новое значение (например, если проектов 0)
                 state = ProjectsState.Success(repository.projects.value)
             } catch (e: Exception) {

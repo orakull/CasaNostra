@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.player
 
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
@@ -50,7 +50,6 @@ class PlayerViewModel(
     private val _project = MutableStateFlow<Project?>(null)
     val project: StateFlow<Project?> = _project.asStateFlow()
 
-    // Expose tracks from repository
     val projectTracks: StateFlow<List<ProjectTrack>> = trackRepository.tracks
 
     var isUploading by mutableStateOf(false)
@@ -59,11 +58,42 @@ class PlayerViewModel(
     var uploadError by mutableStateOf<String?>(null)
         private set
 
-    // Per-file upload state list
     var uploadItems = mutableStateListOf<UploadItemState>()
         private set
 
-    fun setProject(project: com.orakull.casanostra.data.models.Project, userId: String = "") {
+    val player = MultitrackPlayer()
+
+    var tracks = mutableStateListOf<TrackState>()
+        private set
+
+    var isPlaying by mutableStateOf(false)
+        private set
+
+    var currentPositionMs by mutableLongStateOf(0L)
+        private set
+
+    var durationMs by mutableLongStateOf(0L)
+        private set
+
+    var isLoaded by mutableStateOf(false)
+        private set
+
+    private var _currentUserId: String = ""
+    private var positionJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    private val trackColorPool = listOf(
+        androidx.compose.ui.graphics.Color(0xFFEF9A9A), // Soft Red/Pink
+        androidx.compose.ui.graphics.Color(0xFFCE93D8), // Soft Purple
+        androidx.compose.ui.graphics.Color(0xFF81D4FA), // Soft Blue
+        androidx.compose.ui.graphics.Color(0xFF80DEEA), // Soft Cyan
+        androidx.compose.ui.graphics.Color(0xFFA5D6A7), // Soft Green
+        androidx.compose.ui.graphics.Color(0xFFE6EE9C), // Soft Lime
+        androidx.compose.ui.graphics.Color(0xFFFFF59D), // Soft Yellow
+        androidx.compose.ui.graphics.Color(0xFFFFCC80), // Soft Orange
+    )
+
+    fun setProject(project: Project, userId: String = "") {
         _project.value = project
         _currentUserId = userId
         tracks.clear()
@@ -75,7 +105,6 @@ class PlayerViewModel(
                 trackRepository.fetchTracks(project.id)
                 val repoTracks = trackRepository.tracks.value
                 if (repoTracks.isEmpty()) {
-                    // No tracks — still run eviction so orphaned files are removed
                     evictStaleCache()
                     isLoaded = true
                 } else {
@@ -88,18 +117,14 @@ class PlayerViewModel(
         }
     }
 
-    private var _currentUserId: String = ""
-
-    private fun loadProjectTracksIntoPlayer(projectTracks: List<com.orakull.casanostra.data.models.ProjectTrack>) {
+    private fun loadProjectTracksIntoPlayer(projectTracks: List<ProjectTrack>) {
         viewModelScope.launch {
             try {
                 isLoaded = false
 
-                // Cache-first: each track is served from local cache when available.
-                // Cache misses trigger a download from Supabase and are then stored.
                 val trackInfos = projectTracks.map { pt ->
                     val bytes = trackRepository.getOrDownloadTrackBytes(pt.filePath)
-                    com.orakull.casanostra.audio.TrackInfo(name = pt.name, resourceBytes = bytes)
+                    TrackInfo(name = pt.name, resourceBytes = bytes)
                 }
 
                 player.loadTracks(trackInfos)
@@ -117,7 +142,6 @@ class PlayerViewModel(
                 durationMs = player.getDurationMs()
                 isLoaded = true
 
-                // Evict stale cache entries across all projects after tracks are loaded.
                 evictStaleCache()
             } catch (e: Exception) {
                 println("LOAD_TRACKS_ERROR: ${e.message}")
@@ -126,13 +150,6 @@ class PlayerViewModel(
         }
     }
 
-    /**
-     * Fetches the set of all valid track filePaths from the backend (all user projects)
-     * and removes from cache any entry that no longer exists on the backend.
-     *
-     * Runs as a best-effort background task — failures are silently swallowed
-     * so they don't affect the main playback flow.
-     */
     private suspend fun evictStaleCache() {
         try {
             val validPaths = trackRepository.fetchAllUserTrackPaths(_currentUserId)
@@ -177,14 +194,12 @@ class PlayerViewModel(
         val project = _project.value ?: return
         if (files.isEmpty()) return
 
-        // Initialize upload items
         uploadItems.clear()
         files.forEach { uploadItems.add(UploadItemState(file = it)) }
         isUploading = true
         uploadError = null
 
         viewModelScope.launch {
-            // Launch all uploads in parallel
             val jobs = files.mapIndexed { index, file ->
                 async {
                     uploadSingleFile(project.id, index, file)
@@ -194,13 +209,9 @@ class PlayerViewModel(
 
             val anyFailed = uploadItems.any { it.status == UploadStatus.ERROR }
             if (!anyFailed) {
-                // All uploaded successfully — reload player
                 isUploading = false
                 val updatedTracks = trackRepository.tracks.value
                 loadProjectTracksIntoPlayer(updatedTracks)
-            } else {
-                // Keep overlay open with error states to allow Retry
-                // isUploading stays true so overlay stays visible
             }
         }
     }
@@ -208,12 +219,9 @@ class PlayerViewModel(
     private suspend fun uploadSingleFile(projectId: String, index: Int, file: PlatformFile) {
         uploadItems[index] = uploadItems[index].copy(status = UploadStatus.UPLOADING, progress = 0.1f)
         try {
-            // Read bytes once — held in RAM until we know the server-assigned filePath.
             val bytes = file.readBytes()
             uploadItems[index] = uploadItems[index].copy(progress = 0.5f)
 
-            // uploadTrack uploads to Supabase AND caches under the canonical filePath.
-            // After this call the bytes are in cache; the player never re-downloads.
             trackRepository.uploadTrack(projectId, file.name, bytes)
 
             uploadItems[index] = uploadItems[index].copy(status = UploadStatus.DONE, progress = 1f)
@@ -258,7 +266,6 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 trackRepository.deleteTrack(trackId, filePath)
-                // Reload all tracks to sync with player state
                 loadProjectTracksIntoPlayer(trackRepository.tracks.value)
             } catch (e: Exception) {
                 println("DELETE_TRACK_ERROR: ${e.message}")
@@ -270,7 +277,6 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 trackRepository.renameTrack(trackId, newName)
-                // Sync with local state list
                 val index = trackRepository.tracks.value.indexOfFirst { it.id == trackId }
                 if (index != -1 && index < tracks.size) {
                     tracks[index] = tracks[index].copy(name = newName)
@@ -278,58 +284,6 @@ class PlayerViewModel(
             } catch (e: Exception) {
                 println("RENAME_TRACK_ERROR: ${e.message}")
             }
-        }
-    }
-
-    val player = MultitrackPlayer()
-
-    var tracks = mutableStateListOf<TrackState>()
-        private set
-
-    var isPlaying by mutableStateOf(false)
-        private set
-
-    var currentPositionMs by mutableLongStateOf(0L)
-        private set
-
-    var durationMs by mutableLongStateOf(0L)
-        private set
-
-    var isLoaded by mutableStateOf(false)
-        private set
-
-    private var positionJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-
-    private val trackColorPool = listOf(
-        androidx.compose.ui.graphics.Color(0xFFEF9A9A), // Soft Red/Pink (Hue ~0)
-        androidx.compose.ui.graphics.Color(0xFFCE93D8),  // Soft Purple (Hue ~280)
-        androidx.compose.ui.graphics.Color(0xFF81D4FA), // Soft Blue (Hue ~200)
-        androidx.compose.ui.graphics.Color(0xFF80DEEA), // Soft Cyan (Hue ~180)
-        androidx.compose.ui.graphics.Color(0xFFA5D6A7), // Soft Green (Hue ~120)
-        androidx.compose.ui.graphics.Color(0xFFE6EE9C), // Soft Lime (Hue ~65)
-        androidx.compose.ui.graphics.Color(0xFFFFF59D), // Soft Yellow (Hue ~50)
-        androidx.compose.ui.graphics.Color(0xFFFFCC80), // Soft Orange (Hue ~35)
-    )
-
-    fun loadTracks(trackInfos: List<TrackInfo>) {
-        player.loadTracks(trackInfos)
-
-        tracks.clear()
-        trackInfos.forEachIndexed { index, info ->
-            tracks.add(
-                TrackState(
-                    name = info.name,
-                    color = trackColorPool[index % trackColorPool.size]
-                )
-            )
-        }
-
-        // Wait a moment for ExoPlayer to prepare, then get duration
-        scope.launch {
-            delay(500)
-            durationMs = player.getDurationMs()
-            isLoaded = true
         }
     }
 
@@ -392,7 +346,6 @@ class PlayerViewModel(
                 currentPositionMs = player.getCurrentPositionMs()
                 durationMs = player.getDurationMs().takeIf { it > 0 } ?: durationMs
 
-                // Check if playback ended
                 if (durationMs > 0 && currentPositionMs >= durationMs) {
                     player.stop()
                     isPlaying = false

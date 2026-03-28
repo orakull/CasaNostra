@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.player
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import com.orakull.casanostra.ui.common.LockScreenOrientation
+import com.orakull.casanostra.ui.common.ScreenOrientation
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
@@ -48,17 +50,15 @@ fun PlayerScreen(
     val project by viewModel.project.collectAsState()
     val projectTracks by viewModel.projectTracks.collectAsState()
     val isUploading = viewModel.isUploading
-    
+
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
-    // Track Editing State
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
     var selectedTrackFilePath by remember { mutableStateOf<String?>(null) }
     var showTrackEditDialog by remember { mutableStateOf(false) }
     var showTrackDeleteDialog by remember { mutableStateOf(false) }
 
-    // FileKit Launcher — multi-select mode
     val filePickerLauncher = rememberFilePickerLauncher(
         type = PickerType.File(extensions = listOf("wav", "mp3")),
         mode = PickerMode.Multiple(),
@@ -96,12 +96,11 @@ fun PlayerScreen(
         } else {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val isLandscape = maxWidth > maxHeight
-                
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp) // Space for FAB
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                // Aesthetic Header Region - scrolls away
                 if (!isLandscape) {
                     item {
                         AestheticHeader(
@@ -114,7 +113,6 @@ fun PlayerScreen(
                     }
                 }
 
-                // Pinned Transport & Progress
                 stickyHeader {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -206,9 +204,8 @@ fun PlayerScreen(
                     }
                 }
 
-                // Tracks
                 item { Spacer(modifier = Modifier.height(16.dp)) }
-                
+
                 itemsIndexed(tracks) { index, track ->
                     TrackRow(
                         track = track,
@@ -390,7 +387,7 @@ fun PlayerScreen(
 
 @Composable
 private fun AestheticHeader(
-    projectName: String, 
+    projectName: String,
     onBack: () -> Unit,
     onRenameClick: () -> Unit,
     onDeleteClick: () -> Unit
@@ -404,7 +401,6 @@ private fun AestheticHeader(
                 shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
             )
     ) {
-        // Back button in top-left corner
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -418,7 +414,6 @@ private fun AestheticHeader(
             )
         }
 
-        // Delete button in top-right corner
         IconButton(
             onClick = onDeleteClick,
             modifier = Modifier
@@ -653,7 +648,6 @@ private fun UploadProgressOverlay(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 Text(
                     text = when {
                         allDone -> "Загрузка завершена ✓"
@@ -671,7 +665,6 @@ private fun UploadProgressOverlay(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Track list
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     uploadItems.forEachIndexed { _, item ->
                         UploadTrackCard(item = item)
@@ -680,7 +673,6 @@ private fun UploadProgressOverlay(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Action buttons
                 if (hasErrors && !isStillUploading) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -709,7 +701,6 @@ private fun UploadProgressOverlay(
                         }
                     }
                 } else if (!isStillUploading) {
-                    // All done — auto-dismiss via ViewModel, but still show close
                     TextButton(onClick = onDismiss) {
                         Text("Закрыть")
                     }
@@ -747,7 +738,6 @@ private fun UploadTrackCard(item: UploadItemState) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Status icon
             when (item.status) {
                 UploadStatus.PENDING, UploadStatus.UPLOADING -> {
                     CircularProgressIndicator(
@@ -774,7 +764,6 @@ private fun UploadTrackCard(item: UploadItemState) {
                 }
             }
 
-            // File info + progress bar
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.file.name,
@@ -796,7 +785,6 @@ private fun UploadTrackCard(item: UploadItemState) {
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                 }
-                // Error message
                 if (item.status == UploadStatus.ERROR && item.errorMessage != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -809,7 +797,6 @@ private fun UploadTrackCard(item: UploadItemState) {
                 }
             }
 
-            // Percentage text
             Text(
                 text = when (item.status) {
                     UploadStatus.DONE -> "OK"

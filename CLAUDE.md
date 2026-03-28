@@ -44,12 +44,16 @@ Compose UI (Screen) → ViewModel → Repository → Supabase / local cache
 ```
 
 **Key layers:**
-- `ui/` — Composable screens (`AuthScreen`, `ProjectsScreen`, `PlayerScreen`) + ViewModels. State via `mutableStateOf`/`StateFlow`.
+- `ui/theme/` — `DarkThemeColors` (Material3 dark color scheme)
+- `ui/common/` — `LockScreenOrientation` (`expect`/`actual` composable)
+- `ui/auth/` — `AuthScreen`, `AuthViewModel`, `AuthState`
+- `ui/projects/` — `ProjectsScreen`, `ProjectsViewModel`, `ProjectsState`
+- `ui/player/` — `PlayerScreen`, `PlayerViewModel`, `TrackRow`, `TrackState`, `UploadItemState`
 - `data/models/` — `Project`, `ProjectTrack` (kotlinx-serialization)
 - `data/repository/` — `ProjectRepository`, `TrackRepository` — remote Supabase ops + cache coordination
 - `audio/MultitrackPlayer` — `expect`/`actual`: Android uses Media3/ExoPlayer, iOS uses AVFoundation, Web uses Web Audio API
 - `cache/AudioFileCache` — `expect`/`actual`: Android = filesystem (`cacheDir/audio_tracks/`), iOS = NSCachesDirectory, Web = in-memory HashMap
-- `SupabaseModule.kt` — Koin DI module, creates singleton `SupabaseClient`
+- `di/AppModule.kt` — Koin DI module (`appModule`), creates singleton `SupabaseClient`, repositories, cache
 
 **App navigation** is a state machine in `App.kt`: `Loading → NotAuthenticated → Authenticated`, switching between `ProjectsScreen` and `PlayerScreen`.
 
