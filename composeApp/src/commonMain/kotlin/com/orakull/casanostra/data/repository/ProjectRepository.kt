@@ -24,12 +24,24 @@ class ProjectRepository(
                 }
                 order("created_at", order = io.github.jan.supabase.postgrest.query.Order.DESCENDING)
             }.decodeList<Project>()
-        
+
         _projects.value = fetchedProjects
     }
 
-    suspend fun createProject(name: String, userId: String): Project {
-        val newProject = Project(name = name, ownerId = userId)
+    suspend fun fetchProjectsByWorkspace(workspaceId: String) {
+        val fetchedProjects = supabaseClient.from("projects")
+            .select {
+                filter {
+                    eq("workspace_id", workspaceId)
+                }
+                order("created_at", order = io.github.jan.supabase.postgrest.query.Order.DESCENDING)
+            }.decodeList<Project>()
+
+        _projects.value = fetchedProjects
+    }
+
+    suspend fun createProject(name: String, userId: String, workspaceId: String? = null): Project {
+        val newProject = Project(name = name, ownerId = userId, workspaceId = workspaceId ?: "")
         val createdProject = supabaseClient.from("projects")
             .insert(newProject) {
                 select()

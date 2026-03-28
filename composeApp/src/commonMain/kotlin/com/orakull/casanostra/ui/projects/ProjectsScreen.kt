@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material3.*
@@ -27,6 +27,7 @@ fun ProjectsScreen(
     viewModel: ProjectsViewModel,
     onProjectSelected: (Project) -> Unit,
     onLogout: () -> Unit,
+    workspaceName: String? = null,
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(viewModel) {
@@ -56,7 +57,8 @@ fun ProjectsScreen(
                 item {
                     AestheticProjectsHeader(
                         userEmail = viewModel.currentUserEmail ?: "Пользователь",
-                        onLogout = onLogout
+                        workspaceName = workspaceName,
+                        onBack = onLogout
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -175,7 +177,7 @@ private fun ProjectItem(project: Project, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
+private fun AestheticProjectsHeader(userEmail: String, workspaceName: String?, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,10 +188,14 @@ private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
             )
     ) {
         IconButton(
-            onClick = onLogout,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.TopStart).padding(16.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Выйти", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Назад",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         Column(
@@ -212,7 +218,7 @@ private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = userEmail,
+                text = workspaceName ?: userEmail,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -220,7 +226,7 @@ private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Ваши проекты",
+                text = "Проекты",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -10,8 +10,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.orakull.casanostra.data.models.Project
+import com.orakull.casanostra.data.models.Workspace
 import com.orakull.casanostra.data.repository.ProjectRepository
 import com.orakull.casanostra.data.repository.TrackRepository
+import com.orakull.casanostra.data.repository.WorkspaceRepository
 import com.orakull.casanostra.ui.auth.AuthScreen
 import com.orakull.casanostra.ui.auth.AuthState
 import com.orakull.casanostra.ui.auth.AuthViewModel
@@ -20,6 +22,8 @@ import com.orakull.casanostra.ui.player.PlayerViewModel
 import com.orakull.casanostra.ui.projects.ProjectsScreen
 import com.orakull.casanostra.ui.projects.ProjectsViewModel
 import com.orakull.casanostra.ui.theme.DarkThemeColors
+import com.orakull.casanostra.ui.workspaces.WorkspacesScreen
+import com.orakull.casanostra.ui.workspaces.WorkspacesViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import org.koin.compose.koinInject
@@ -33,16 +37,11 @@ fun App() {
 
         AnimatedContent(
             targetState = authState,
-            transitionSpec = {
-                fadeIn() togetherWith fadeOut()
-            }
+            transitionSpec = { fadeIn() togetherWith fadeOut() }
         ) { state ->
             when (state) {
                 is AuthState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -52,49 +51,81 @@ fun App() {
                 }
 
                 is AuthState.Authenticated -> {
-                    var currentScreen by remember { mutableStateOf("projects") }
+                    var currentScreen by remember { mutableStateOf("workspaces") }
+                    var selectedWorkspace by remember { mutableStateOf<Workspace?>(null) }
                     var selectedProject by remember { mutableStateOf<Project?>(null) }
 
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
-                            if (targetState == "player") {
-                                slideInHorizontally { width -> width } + fadeIn() togetherWith slideOutHorizontally { width -> -width } + fadeOut()
+                            if (targetState == "player" || (targetState == "projects" && initialState == "workspaces")) {
+                                slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
                             } else {
-                                slideInHorizontally { width -> -width } + fadeIn() togetherWith slideOutHorizontally { width -> width } + fadeOut()
+                                slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
                             }
                         }
                     ) { screen ->
-                        if (screen == "projects") {
-                            val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
-                            val repository = koinInject<ProjectRepository>()
-                            val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(repository, supabaseClient) }
-                            ProjectsScreen(
-                                viewModel = projectsViewModel,
-                                onProjectSelected = { project ->
-                                    selectedProject = project
-                                    currentScreen = "player"
-                                },
-                                onLogout = {
-                                    repository.clearProjects()
-                                    authViewModel.signOut()
+                        when (screen) {
+                            "workspaces" -> {
+                                val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
+                                val workspaceRepository = koinInject<WorkspaceRepository>()
+                                val projectRepository = koinInject<ProjectRepository>()
+                                val workspacesViewModel: WorkspacesViewModel = viewModel(key = userId) {
+                                    WorkspacesViewModel(workspaceRepository, supabaseClient)
                                 }
-                            )
-                        } else if (screen == "player") {
-                            val repository = koinInject<ProjectRepository>()
-                            val trackRepository = koinInject<TrackRepository>()
-                            val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository, trackRepository) }
-
-                            LaunchedEffect(selectedProject) {
-                                val userId = supabaseClient.auth.currentUserOrNull()?.id ?: ""
-                                selectedProject?.let { playerViewModel.setProject(it, userId) }
+                                WorkspacesScreen(
+                                    viewModel = workspacesViewModel,
+                                    onWorkspaceSelected = { workspace ->
+                                        selectedWorkspace = workspace
+                                        projectRepository.clearProjects()
+                                        currentScreen = "projects"
+                                    },
+                                    onLogout = {
+                                        workspaceRepository.clearWorkspaces()
+                                        authViewModel.signOut()
+                                    }
+                                )
                             }
 
-                            PlayerScreen(
-                                viewModel = playerViewModel,
-                                onBack = { currentScreen = "projects" },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            "projects" -> {
+                                val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
+                                val workspaceId = selectedWorkspace?.id
+                                val repository = koinInject<ProjectRepository>()
+                                val projectsViewModel: ProjectsViewModel = viewModel(
+                                    key = "$userId-$workspaceId"
+                                ) {
+                                    ProjectsViewModel(repository, supabaseClient, workspaceId)
+                                }
+                                ProjectsScreen(
+                                    viewModel = projectsViewModel,
+                                    onProjectSelected = { project ->
+                                        selectedProject = project
+                                        currentScreen = "player"
+                                    },
+                                    onLogout = {
+                                        repository.clearProjects()
+                                        currentScreen = "workspaces"
+                                    },
+                                    workspaceName = selectedWorkspace?.name
+                                )
+                            }
+
+                            "player" -> {
+                                val repository = koinInject<ProjectRepository>()
+                                val trackRepository = koinInject<TrackRepository>()
+                                val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository, trackRepository) }
+
+                                LaunchedEffect(selectedProject) {
+                                    val userId = supabaseClient.auth.currentUserOrNull()?.id ?: ""
+                                    selectedProject?.let { playerViewModel.setProject(it, userId) }
+                                }
+
+                                PlayerScreen(
+                                    viewModel = playerViewModel,
+                                    onBack = { currentScreen = "projects" },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
                 }
