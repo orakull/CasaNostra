@@ -24,7 +24,7 @@ data class Project(
     val id: String = "",
     val name: String,
     @SerialName("owner_id") val ownerId: String = "",
-    @SerialName("workspace_id") val workspaceId: String = "",
+    @SerialName("workspace_id") val workspaceId: String? = null,
     @SerialName("created_at") val createdAt: String = ""
 )
 

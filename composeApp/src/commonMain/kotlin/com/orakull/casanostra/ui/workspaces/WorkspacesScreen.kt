@@ -34,10 +34,6 @@ fun WorkspacesScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LaunchedEffect(viewModel) {
-        viewModel.loadWorkspaces()
-    }
-
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
     var joinError by remember { mutableStateOf<String?>(null) }

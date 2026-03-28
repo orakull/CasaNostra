@@ -41,7 +41,7 @@ class ProjectRepository(
     }
 
     suspend fun createProject(name: String, userId: String, workspaceId: String? = null): Project {
-        val newProject = Project(name = name, ownerId = userId, workspaceId = workspaceId ?: "")
+        val newProject = Project(name = name, ownerId = userId, workspaceId = workspaceId)
         val createdProject = supabaseClient.from("projects")
             .insert(newProject) {
                 select()
