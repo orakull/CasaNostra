@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.projects
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +32,7 @@ fun ProjectsScreen(
     LaunchedEffect(viewModel) {
         viewModel.loadProjects()
     }
-    
+
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -165,7 +165,7 @@ private fun ProjectItem(project: Project, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Создан: ${project.createdAt.take(10)}", // Just showing date prefix roughly
+                    text = "Создан: ${project.createdAt.take(10)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -185,7 +185,6 @@ private fun AestheticProjectsHeader(userEmail: String, onLogout: () -> Unit) {
                 shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
             )
     ) {
-        // Logout button moved here
         IconButton(
             onClick = onLogout,
             modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)

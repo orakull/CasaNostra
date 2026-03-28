@@ -2,6 +2,7 @@ package com.orakull.casanostra
 
 import android.app.Application
 import com.orakull.casanostra.cache.initAndroidAudioCache
+import com.orakull.casanostra.di.appModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -16,7 +17,7 @@ class CasaNostraApplication : Application() {
 
         startKoin {
             androidContext(this@CasaNostraApplication)
-            modules(supabaseModule)
+            modules(appModule)
         }
     }
 }

@@ -5,39 +5,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
-import casanostra.composeapp.generated.resources.Res
-import com.orakull.casanostra.audio.TrackInfo
 import com.orakull.casanostra.data.models.Project
-import com.orakull.casanostra.ui.*
+import com.orakull.casanostra.data.repository.ProjectRepository
+import com.orakull.casanostra.data.repository.TrackRepository
+import com.orakull.casanostra.ui.auth.AuthScreen
+import com.orakull.casanostra.ui.auth.AuthState
+import com.orakull.casanostra.ui.auth.AuthViewModel
+import com.orakull.casanostra.ui.player.PlayerScreen
+import com.orakull.casanostra.ui.player.PlayerViewModel
+import com.orakull.casanostra.ui.projects.ProjectsScreen
+import com.orakull.casanostra.ui.projects.ProjectsViewModel
+import com.orakull.casanostra.ui.theme.DarkThemeColors
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
-import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.compose.koinInject
 
-val DarkThemeColors = darkColorScheme(
-    primary = Color(0xFF00E676),
-    onPrimary = Color(0xFF1B1B1F),
-    primaryContainer = Color(0xFF1B1B1F),
-    onPrimaryContainer = Color(0xFF00E676),
-    background = Color(0xFF121215),
-    onBackground = Color(0xFFE3E3E8),
-    surface = Color(0xFF1B1B1F),
-    onSurface = Color(0xFFE3E3E8),
-    surfaceVariant = Color(0xFF23232A),
-    onSurfaceVariant = Color(0xFFAAAABB),
-    error = Color(0xFFCF6679),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6)
-)
-
-@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun App() {
     MaterialTheme(colorScheme = DarkThemeColors) {
@@ -68,7 +54,7 @@ fun App() {
                 is AuthState.Authenticated -> {
                     var currentScreen by remember { mutableStateOf("projects") }
                     var selectedProject by remember { mutableStateOf<Project?>(null) }
-                    
+
                     AnimatedContent(
                         targetState = currentScreen,
                         transitionSpec = {
@@ -81,25 +67,24 @@ fun App() {
                     ) { screen ->
                         if (screen == "projects") {
                             val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
-                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
+                            val repository = koinInject<ProjectRepository>()
                             val projectsViewModel: ProjectsViewModel = viewModel(key = userId) { ProjectsViewModel(repository, supabaseClient) }
                             ProjectsScreen(
                                 viewModel = projectsViewModel,
-                                onProjectSelected = { project -> 
+                                onProjectSelected = { project ->
                                     selectedProject = project
-                                    currentScreen = "player" 
+                                    currentScreen = "player"
                                 },
-                                onLogout = { 
+                                onLogout = {
                                     repository.clearProjects()
-                                    authViewModel.signOut() 
+                                    authViewModel.signOut()
                                 }
                             )
                         } else if (screen == "player") {
-                            val repository = koinInject<com.orakull.casanostra.data.repository.ProjectRepository>()
-                            val trackRepository = koinInject<com.orakull.casanostra.data.repository.TrackRepository>()
+                            val repository = koinInject<ProjectRepository>()
+                            val trackRepository = koinInject<TrackRepository>()
                             val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(repository, trackRepository) }
-                            val scope = rememberCoroutineScope()
-                            
+
                             LaunchedEffect(selectedProject) {
                                 val userId = supabaseClient.auth.currentUserOrNull()?.id ?: ""
                                 selectedProject?.let { playerViewModel.setProject(it, userId) }

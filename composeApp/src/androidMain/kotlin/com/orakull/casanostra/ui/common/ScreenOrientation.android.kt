@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.common
 
 import android.app.Activity
 import android.content.Context

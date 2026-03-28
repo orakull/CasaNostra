@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.auth
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,8 +18,6 @@ sealed class AuthState {
     data object NotAuthenticated : AuthState()
     data object Authenticated : AuthState()
 }
-
-
 
 class AuthViewModel(
     private val supabaseClient: SupabaseClient
@@ -89,7 +87,6 @@ class AuthViewModel(
             }
         }
     }
-
 
     fun signIn(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {

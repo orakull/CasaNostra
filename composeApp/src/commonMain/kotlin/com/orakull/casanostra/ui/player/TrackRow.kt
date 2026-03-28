@@ -1,4 +1,4 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -99,14 +99,14 @@ fun TrackRow(
             LetterToggleButton(
                 text = "M",
                 isActive = isMuted,
-                activeColor = Color(0xFF1976D2), // Material Blue 700
+                activeColor = Color(0xFF1976D2),
                 onClick = onMuteToggle
             )
 
             LetterToggleButton(
                 text = "S",
                 isActive = isSolo,
-                activeColor = Color(0xFFFFC107), // Amber 500
+                activeColor = Color(0xFFFFC107),
                 onClick = onSoloToggle
             )
         }

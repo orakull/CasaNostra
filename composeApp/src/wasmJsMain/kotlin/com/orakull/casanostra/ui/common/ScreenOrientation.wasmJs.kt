@@ -1,8 +1,8 @@
-package com.orakull.casanostra.ui
+package com.orakull.casanostra.ui.common
 
 import androidx.compose.runtime.Composable
 
 @Composable
 actual fun LockScreenOrientation(orientation: ScreenOrientation) {
-    // No-op for iOS temporarily
+    // No-op for WasmJs
 }
