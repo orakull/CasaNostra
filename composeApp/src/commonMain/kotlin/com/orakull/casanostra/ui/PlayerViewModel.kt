@@ -13,6 +13,9 @@ import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.data.models.ProjectTrack
 import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
+import io.github.vinceglb.filekit.core.PlatformFile
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -21,6 +24,15 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.cancel
+
+enum class UploadStatus { PENDING, UPLOADING, DONE, ERROR }
+
+data class UploadItemState(
+    val file: PlatformFile,
+    val status: UploadStatus = UploadStatus.PENDING,
+    val progress: Float = 0f,
+    val errorMessage: String? = null
+)
 
 data class TrackState(
     val name: String,
@@ -45,6 +57,10 @@ class PlayerViewModel(
         private set
 
     var uploadError by mutableStateOf<String?>(null)
+        private set
+
+    // Per-file upload state list
+    var uploadItems = mutableStateListOf<UploadItemState>()
         private set
 
     fun setProject(project: com.orakull.casanostra.data.models.Project) {
@@ -126,26 +142,84 @@ class PlayerViewModel(
         }
     }
 
-    fun uploadAudio(file: io.github.vinceglb.filekit.core.PlatformFile) {
+    fun uploadAudio(file: PlatformFile) {
+        uploadMultipleAudio(listOf(file))
+    }
+
+    fun uploadMultipleAudio(files: List<PlatformFile>) {
         val project = _project.value ?: return
+        if (files.isEmpty()) return
+
+        // Initialize upload items
+        uploadItems.clear()
+        files.forEach { uploadItems.add(UploadItemState(file = it)) }
+        isUploading = true
+        uploadError = null
+
         viewModelScope.launch {
-            try {
-                isUploading = true
-                uploadError = null
-                val bytes = file.readBytes()
-                trackRepository.uploadTrack(project.id, file.name, bytes)
-                
-                // After successful upload, reload player tracks to include the new one
+            // Launch all uploads in parallel
+            val jobs = files.mapIndexed { index, file ->
+                async {
+                    uploadSingleFile(project.id, index, file)
+                }
+            }
+            jobs.awaitAll()
+
+            val anyFailed = uploadItems.any { it.status == UploadStatus.ERROR }
+            if (!anyFailed) {
+                // All uploaded successfully — reload player
+                isUploading = false
                 val updatedTracks = trackRepository.tracks.value
                 loadProjectTracksIntoPlayer(updatedTracks)
-            } catch (e: Exception) {
-                println("UPLOAD_ERROR: ${e::class.simpleName}: ${e.message}")
-                uploadError = "Ошибка загрузки: ${e.message}"
-                e.printStackTrace()
-            } finally {
-                isUploading = false
+            } else {
+                // Keep overlay open with error states to allow Retry
+                // isUploading stays true so overlay stays visible
             }
         }
+    }
+
+    private suspend fun uploadSingleFile(projectId: String, index: Int, file: PlatformFile) {
+        uploadItems[index] = uploadItems[index].copy(status = UploadStatus.UPLOADING, progress = 0.1f)
+        try {
+            val bytes = file.readBytes()
+            uploadItems[index] = uploadItems[index].copy(progress = 0.5f)
+            trackRepository.uploadTrack(projectId, file.name, bytes)
+            uploadItems[index] = uploadItems[index].copy(status = UploadStatus.DONE, progress = 1f)
+        } catch (e: Exception) {
+            println("UPLOAD_ERROR[${file.name}]: ${e::class.simpleName}: ${e.message}")
+            uploadItems[index] = uploadItems[index].copy(
+                status = UploadStatus.ERROR,
+                progress = 0f,
+                errorMessage = e.message ?: "Неизвестная ошибка"
+            )
+        }
+    }
+
+    fun retryFailedUploads() {
+        val project = _project.value ?: return
+        val failedIndices = uploadItems.indices.filter { uploadItems[it].status == UploadStatus.ERROR }
+        if (failedIndices.isEmpty()) return
+
+        viewModelScope.launch {
+            val jobs = failedIndices.map { index ->
+                async {
+                    uploadSingleFile(project.id, index, uploadItems[index].file)
+                }
+            }
+            jobs.awaitAll()
+
+            val anyFailed = uploadItems.any { it.status == UploadStatus.ERROR }
+            if (!anyFailed) {
+                isUploading = false
+                val updatedTracks = trackRepository.tracks.value
+                loadProjectTracksIntoPlayer(updatedTracks)
+            }
+        }
+    }
+
+    fun dismissUploadOverlay() {
+        isUploading = false
+        uploadItems.clear()
     }
 
     fun deleteTrack(trackId: String, filePath: String) {
