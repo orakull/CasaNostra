@@ -199,6 +199,34 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION create_default_workspace();
 
 -- =============================================================================
--- Supabase Storage: разрешить анонимный доступ к трекам по share_token
--- (Настраивается в Dashboard → Storage → Policies, см. инструкции)
+-- Supabase Storage: политики для бакета "tracks"
+-- Выполнить в Supabase Dashboard → SQL Editor
 -- =============================================================================
+
+-- Только владелец проекта может удалять файлы треков.
+-- Путь к файлу имеет формат: {project_id}/{uuid}
+-- Извлекаем project_id из пути и проверяем владельца проекта.
+CREATE POLICY "Only project owners can delete tracks"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'tracks'
+  AND EXISTS (
+    SELECT 1 FROM public.projects
+    WHERE projects.id::text = split_part(storage.objects.name, '/', 1)
+      AND projects.owner_id = auth.uid()
+  )
+);
+
+-- Только владелец проекта может загружать файлы треков.
+CREATE POLICY "Only project owners can upload tracks"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'tracks'
+  AND EXISTS (
+    SELECT 1 FROM public.projects
+    WHERE projects.id::text = split_part(storage.objects.name, '/', 1)
+      AND projects.owner_id = auth.uid()
+  )
+);

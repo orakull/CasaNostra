@@ -54,6 +54,10 @@ fun App() {
                     var currentScreen by remember { mutableStateOf("workspaces") }
                     var selectedWorkspace by remember { mutableStateOf<Workspace?>(null) }
                     var selectedProject by remember { mutableStateOf<Project?>(null) }
+                    val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+                    val isReadOnly by remember(selectedWorkspace, currentUserId) {
+                        mutableStateOf(selectedWorkspace?.ownerId != currentUserId)
+                    }
 
                     AnimatedContent(
                         targetState = currentScreen,
@@ -106,7 +110,8 @@ fun App() {
                                         repository.clearProjects()
                                         currentScreen = "workspaces"
                                     },
-                                    workspaceName = selectedWorkspace?.name
+                                    workspaceName = selectedWorkspace?.name,
+                                    isReadOnly = isReadOnly
                                 )
                             }
 
@@ -123,6 +128,7 @@ fun App() {
                                 PlayerScreen(
                                     viewModel = playerViewModel,
                                     onBack = { currentScreen = "projects" },
+                                    isReadOnly = isReadOnly,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }

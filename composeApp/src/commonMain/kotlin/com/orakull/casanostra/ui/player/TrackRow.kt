@@ -25,7 +25,7 @@ fun TrackRow(
     onVolumeChange: (Float) -> Unit,
     onMuteToggle: () -> Unit,
     onSoloToggle: () -> Unit,
-    onTrackClick: () -> Unit = {},
+    onTrackClick: (() -> Unit)? = {},
     modifier: Modifier = Modifier
 ) {
     val isMuted = track.isMuted
@@ -37,7 +37,7 @@ fun TrackRow(
             .padding(horizontal = 8.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .clickable { onTrackClick() }
+            .then(if (onTrackClick != null) Modifier.clickable { onTrackClick() } else Modifier)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

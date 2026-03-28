@@ -28,6 +28,7 @@ fun ProjectsScreen(
     onProjectSelected: (Project) -> Unit,
     onLogout: () -> Unit,
     workspaceName: String? = null,
+    isReadOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(viewModel) {
@@ -39,12 +40,14 @@ fun ProjectsScreen(
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Filled.Add, "Создать проект")
+            if (!isReadOnly) {
+                FloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Add, "Создать проект")
+                }
             }
         }
     ) { padding ->
