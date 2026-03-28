@@ -15,9 +15,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.orakull.casanostra.ui.theme.LocalCasaNostraColors
 
 /**
  * Сегментированный контрол Mute/Solo.
@@ -37,23 +37,25 @@ internal fun MuteSoloSegmentedButton(
     onSoloToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val extras = LocalCasaNostraColors.current
+
     val muteBackground by animateColorAsState(
-        targetValue = if (isMuted) Color(0xFF5B7AA5) else MaterialTheme.colorScheme.surfaceContainerHigh,
+        targetValue = if (isMuted) extras.muteActive else MaterialTheme.colorScheme.surfaceContainerHigh,
         animationSpec = tween(200),
         label = "mute_bg",
     )
     val muteTextColor by animateColorAsState(
-        targetValue = if (isMuted) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (isMuted) extras.onMuteActive else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(200),
         label = "mute_text",
     )
     val soloBackground by animateColorAsState(
-        targetValue = if (isSolo) Color(0xFFC49A3C) else MaterialTheme.colorScheme.surfaceContainerHigh,
+        targetValue = if (isSolo) extras.soloActive else MaterialTheme.colorScheme.surfaceContainerHigh,
         animationSpec = tween(200),
         label = "solo_bg",
     )
     val soloTextColor by animateColorAsState(
-        targetValue = if (isSolo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (isSolo) extras.onSoloActive else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(200),
         label = "solo_text",
     )
