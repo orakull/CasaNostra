@@ -1,5 +1,8 @@
 package com.orakull.casanostra.ui.player
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -9,14 +12,13 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 
 @Composable
 fun TrackRow(
@@ -31,84 +33,86 @@ fun TrackRow(
     val isMuted = track.isMuted
     val isSolo = track.isSolo
 
-    Row(
+    Card(
+        onClick = { onTrackClick?.invoke() },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .then(if (onTrackClick != null) Modifier.clickable { onTrackClick() } else Modifier)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        enabled = onTrackClick != null
     ) {
-        // Track color indicator
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(32.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(track.color)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // Info and Volume
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                text = track.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Top row: color indicator + name + volume % + M/S buttons
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = if (track.volume == 0f || isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = if (track.volume == 0f || isMuted) "Убавить" else "Увеличить",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(track.color)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = track.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Slider(
-                    value = track.volume,
-                    onValueChange = onVolumeChange,
-                    valueRange = 0f..1f,
-                    modifier = Modifier.weight(1f).height(24.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = track.color,
-                        activeTrackColor = track.color,
-                        inactiveTrackColor = track.color.copy(alpha = 0.2f)
-                    )
-                )
-                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "${(track.volume * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(32.dp)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                LetterToggleButton(
+                    text = "M",
+                    isActive = isMuted,
+                    activeColor = Color(0xFF5B7AA5),
+                    onClick = onMuteToggle
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                LetterToggleButton(
+                    text = "S",
+                    isActive = isSolo,
+                    activeColor = Color(0xFFC49A3C),
+                    onClick = onSoloToggle
+                )
             }
-        }
 
-        // Toggles
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LetterToggleButton(
-                text = "M",
-                isActive = isMuted,
-                activeColor = Color(0xFF1976D2),
-                onClick = onMuteToggle
-            )
+            Spacer(modifier = Modifier.height(6.dp))
 
-            LetterToggleButton(
-                text = "S",
-                isActive = isSolo,
-                activeColor = Color(0xFFFFC107),
-                onClick = onSoloToggle
-            )
+            // Bottom row: volume icon + slider
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (track.volume == 0f || isMuted) Icons.AutoMirrored.Filled.VolumeOff
+                    else Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Slider(
+                    value = track.volume,
+                    onValueChange = onVolumeChange,
+                    valueRange = 0f..1f,
+                    modifier = Modifier.weight(1f).height(20.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = track.color,
+                        activeTrackColor = track.color,
+                        inactiveTrackColor = track.color.copy(alpha = 0.15f)
+                    )
+                )
+            }
         }
     }
 }
@@ -121,18 +125,27 @@ private fun LetterToggleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = tween(200)
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(200)
+    )
+
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(42.dp)
+            .size(36.dp)
             .clip(CircleShape)
-            .background(if (isActive) activeColor else MaterialTheme.colorScheme.surfaceVariant)
+            .background(backgroundColor)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = textColor
         )
     }
 }

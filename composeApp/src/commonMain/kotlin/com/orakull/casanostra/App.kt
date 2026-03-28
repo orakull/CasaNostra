@@ -21,7 +21,7 @@ import com.orakull.casanostra.ui.player.PlayerScreen
 import com.orakull.casanostra.ui.player.PlayerViewModel
 import com.orakull.casanostra.ui.projects.ProjectsScreen
 import com.orakull.casanostra.ui.projects.ProjectsViewModel
-import com.orakull.casanostra.ui.theme.DarkThemeColors
+import com.orakull.casanostra.ui.theme.CasaNostraTheme
 import com.orakull.casanostra.ui.workspaces.WorkspacesScreen
 import com.orakull.casanostra.ui.workspaces.WorkspacesViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -30,7 +30,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun App() {
-    MaterialTheme(colorScheme = DarkThemeColors) {
+    CasaNostraTheme {
         val supabaseClient: SupabaseClient = koinInject()
         val authViewModel: AuthViewModel = viewModel { AuthViewModel(supabaseClient) }
         val authState = authViewModel.authState

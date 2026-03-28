@@ -37,9 +37,9 @@ internal fun TransportControls(
         ) {
             Icon(
                 imageVector = Icons.Filled.FastRewind,
-                contentDescription = "Rewind",
+                contentDescription = "Перемотка",
                 modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onBackground
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -55,7 +55,7 @@ internal fun TransportControls(
         ) {
             Icon(
                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "Pause" else "Play",
+                contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
                 modifier = Modifier.size(playIconSize)
             )
         }
@@ -67,9 +67,9 @@ internal fun TransportControls(
         ) {
             Icon(
                 imageVector = Icons.Filled.Stop,
-                contentDescription = "Stop",
+                contentDescription = "Стоп",
                 modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onBackground
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
