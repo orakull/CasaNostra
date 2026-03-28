@@ -27,6 +27,7 @@ import io.github.vinceglb.filekit.core.PickerType
 fun PlayerScreen(
     viewModel: PlayerViewModel,
     onBack: () -> Unit = {},
+    isReadOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     LockScreenOrientation(ScreenOrientation.Unspecified)
@@ -60,7 +61,7 @@ fun PlayerScreen(
 
     Scaffold(
         floatingActionButton = {
-            if (isLoaded) {
+            if (isLoaded && !isReadOnly) {
                 FloatingActionButton(
                     onClick = { filePickerLauncher.launch() },
                     containerColor = MaterialTheme.colorScheme.primary
@@ -96,7 +97,8 @@ fun PlayerScreen(
                             projectName = project?.name ?: "Проект",
                             onBack = onBack,
                             onRenameClick = { isEditingName = true },
-                            onDeleteClick = { showDeleteConfirmation = true }
+                            onDeleteClick = { showDeleteConfirmation = true },
+                            isReadOnly = isReadOnly
                         )
                         Spacer(modifier = Modifier.height(32.dp))
                     }
@@ -202,12 +204,14 @@ fun PlayerScreen(
                         onVolumeChange = { volume -> viewModel.setVolume(index, volume) },
                         onMuteToggle = { viewModel.toggleMute(index) },
                         onSoloToggle = { viewModel.toggleSolo(index) },
-                        onTrackClick = {
-                            val dbTrack = projectTracks.getOrNull(index)
-                            if (dbTrack != null) {
-                                selectedTrackId = dbTrack.id
-                                selectedTrackFilePath = dbTrack.filePath
-                                showTrackEditDialog = true
+                        onTrackClick = if (isReadOnly) null else {
+                            {
+                                val dbTrack = projectTracks.getOrNull(index)
+                                if (dbTrack != null) {
+                                    selectedTrackId = dbTrack.id
+                                    selectedTrackFilePath = dbTrack.filePath
+                                    showTrackEditDialog = true
+                                }
                             }
                         }
                     )

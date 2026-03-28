@@ -146,6 +146,7 @@ class PlayerViewModel(
             } catch (e: Exception) {
                 println("LOAD_TRACKS_ERROR: ${e.message}")
                 e.printStackTrace()
+                isLoaded = true
             }
         }
     }

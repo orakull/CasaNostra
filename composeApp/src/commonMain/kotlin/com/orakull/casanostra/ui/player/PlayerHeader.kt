@@ -21,7 +21,8 @@ internal fun AestheticHeader(
     projectName: String,
     onBack: () -> Unit,
     onRenameClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    isReadOnly: Boolean = false
 ) {
     Box(
         modifier = Modifier
@@ -45,17 +46,19 @@ internal fun AestheticHeader(
             )
         }
 
-        IconButton(
-            onClick = onDeleteClick,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Delete,
-                contentDescription = "Удалить проект",
-                tint = MaterialTheme.colorScheme.error
-            )
+        if (!isReadOnly) {
+            IconButton(
+                onClick = onDeleteClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = "Удалить проект",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
 
         Column(
@@ -80,21 +83,32 @@ internal fun AestheticHeader(
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))
-            OutlinedButton(
-                onClick = onRenameClick,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.onBackground
-                ),
-                border = null,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            ) {
+            if (isReadOnly) {
                 Text(
                     text = projectName,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
+            } else {
+                OutlinedButton(
+                    onClick = onRenameClick,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onBackground
+                    ),
+                    border = null,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        text = projectName,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(

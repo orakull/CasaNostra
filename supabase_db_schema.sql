@@ -40,3 +40,193 @@ CREATE POLICY "Users can update tracks of own projects" ON project_tracks FOR UP
 CREATE POLICY "Users can delete tracks of own projects" ON project_tracks FOR DELETE USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_tracks.project_id AND projects.owner_id = auth.uid())
 );
+
+-- =============================================================================
+-- МИГРАЦИЯ: Workspaces и шеринг
+-- Выполнить в Supabase Dashboard → SQL Editor
+-- =============================================================================
+
+-- 5. Таблица Воркспейсов
+CREATE TABLE workspaces (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  share_token UUID UNIQUE DEFAULT NULL, -- NULL = приватный, генерируется по запросу
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. Таблица участников воркспейса (joined по ссылке)
+CREATE TABLE workspace_members (
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  joined_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (workspace_id, user_id)
+);
+
+-- 7. Добавить workspace_id в projects
+ALTER TABLE projects
+  ADD COLUMN workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE;
+
+-- Временный индекс для быстрого поиска проектов воркспейса
+CREATE INDEX idx_projects_workspace_id ON projects(workspace_id);
+
+-- =============================================================================
+-- RLS для workspaces
+-- =============================================================================
+ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
+
+-- Владелец видит свои воркспейсы
+CREATE POLICY "Owners can view own workspaces"
+  ON workspaces FOR SELECT
+  USING (auth.uid() = owner_id);
+
+-- Участник (joined) видит воркспейс
+CREATE POLICY "Members can view joined workspaces"
+  ON workspaces FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM workspace_members
+      WHERE workspace_members.workspace_id = workspaces.id
+        AND workspace_members.user_id = auth.uid()
+    )
+  );
+
+-- Любой (включая анонима) может прочитать воркспейс по share_token
+CREATE POLICY "Anyone can view workspace by share_token"
+  ON workspaces FOR SELECT
+  USING (share_token IS NOT NULL);
+
+-- Владелец создаёт воркспейсы
+CREATE POLICY "Owners can insert workspaces"
+  ON workspaces FOR INSERT
+  WITH CHECK (auth.uid() = owner_id);
+
+-- Владелец обновляет свои воркспейсы (переименование, генерация share_token)
+CREATE POLICY "Owners can update own workspaces"
+  ON workspaces FOR UPDATE
+  USING (auth.uid() = owner_id);
+
+-- Владелец удаляет свои воркспейсы
+CREATE POLICY "Owners can delete own workspaces"
+  ON workspaces FOR DELETE
+  USING (auth.uid() = owner_id);
+
+-- =============================================================================
+-- RLS для workspace_members
+-- =============================================================================
+
+-- Участник видит запись о своём членстве
+CREATE POLICY "Members can view own membership"
+  ON workspace_members FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Авторизованный пользователь может вступить (join) в воркспейс
+CREATE POLICY "Authenticated users can join workspaces"
+  ON workspace_members FOR INSERT
+  WITH CHECK (auth.uid() = user_id AND auth.uid() IS NOT NULL);
+
+-- Участник может выйти из воркспейса
+CREATE POLICY "Members can leave workspaces"
+  ON workspace_members FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- =============================================================================
+-- Обновлённые RLS для projects (учитываем workspace)
+-- =============================================================================
+
+-- Участник воркспейса (или аноним по share_token) видит проекты воркспейса
+CREATE POLICY "Workspace members can view projects"
+  ON projects FOR SELECT
+  USING (
+    -- Свои проекты
+    auth.uid() = owner_id
+    OR
+    -- Проекты воркспейса, в котором юзер является участником
+    EXISTS (
+      SELECT 1 FROM workspace_members
+      WHERE workspace_members.workspace_id = projects.workspace_id
+        AND workspace_members.user_id = auth.uid()
+    )
+    OR
+    -- Проекты воркспейса с активным share_token (гостевой доступ)
+    EXISTS (
+      SELECT 1 FROM workspaces
+      WHERE workspaces.id = projects.workspace_id
+        AND workspaces.share_token IS NOT NULL
+    )
+  );
+
+-- Треки: аналогично расширяем доступ через workspace
+CREATE POLICY "Workspace members can view tracks"
+  ON project_tracks FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_tracks.project_id
+        AND (
+          projects.owner_id = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM workspace_members
+            WHERE workspace_members.workspace_id = projects.workspace_id
+              AND workspace_members.user_id = auth.uid()
+          )
+          OR EXISTS (
+            SELECT 1 FROM workspaces
+            WHERE workspaces.id = projects.workspace_id
+              AND workspaces.share_token IS NOT NULL
+          )
+        )
+    )
+  );
+
+-- =============================================================================
+-- Trigger: создать дефолтный воркспейс при регистрации пользователя
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION create_default_workspace()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.workspaces (name, owner_id)
+  VALUES ('My Workspace', NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION create_default_workspace();
+
+-- =============================================================================
+-- Supabase Storage: политики для бакета "tracks"
+-- Выполнить в Supabase Dashboard → SQL Editor
+-- =============================================================================
+
+-- Только владелец проекта может удалять файлы треков.
+-- Путь к файлу имеет формат: {project_id}/{uuid}
+-- Извлекаем project_id из пути и проверяем владельца проекта.
+CREATE POLICY "Only project owners can delete tracks"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'tracks'
+  AND EXISTS (
+    SELECT 1 FROM public.projects
+    WHERE projects.id::text = split_part(storage.objects.name, '/', 1)
+      AND projects.owner_id = auth.uid()
+  )
+);
+
+-- Только владелец проекта может загружать файлы треков.
+CREATE POLICY "Only project owners can upload tracks"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'tracks'
+  AND EXISTS (
+    SELECT 1 FROM public.projects
+    WHERE projects.id::text = split_part(storage.objects.name, '/', 1)
+      AND projects.owner_id = auth.uid()
+  )
+);

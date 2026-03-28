@@ -10,6 +10,7 @@ import com.orakull.casanostra.Secrets
 import com.orakull.casanostra.cache.createAudioFileCache
 import com.orakull.casanostra.data.repository.ProjectRepository
 import com.orakull.casanostra.data.repository.TrackRepository
+import com.orakull.casanostra.data.repository.WorkspaceRepository
 
 val appModule = module {
     single<SupabaseClient> {
@@ -26,6 +27,7 @@ val appModule = module {
     // Platform-specific audio cache (Android: cacheDir, iOS: NSCachesDirectory, Web: in-memory)
     single { createAudioFileCache() }
 
+    single { WorkspaceRepository(get()) }
     single { ProjectRepository(get(), get()) }
     single { TrackRepository(get(), get()) }
 }

@@ -19,7 +19,8 @@ sealed class ProjectsState {
 
 class ProjectsViewModel(
     private val repository: ProjectRepository,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    val workspaceId: String? = null
 ) : ViewModel() {
 
     var state by mutableStateOf<ProjectsState>(ProjectsState.Loading)
@@ -59,10 +60,12 @@ class ProjectsViewModel(
                     return@launch
                 }
 
-                repository.fetchProjects(userId)
+                if (workspaceId != null) {
+                    repository.fetchProjectsByWorkspace(workspaceId)
+                } else {
+                    repository.fetchProjects(userId)
+                }
 
-                // Гарантируем, что после запроса стейт станет Success,
-                // даже если StateFlow не заэмитил новое значение (например, если проектов 0)
                 state = ProjectsState.Success(repository.projects.value)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
@@ -81,7 +84,11 @@ class ProjectsViewModel(
                     return@launch
                 }
 
-                repository.fetchProjects(userId)
+                if (workspaceId != null) {
+                    repository.fetchProjectsByWorkspace(workspaceId)
+                } else {
+                    repository.fetchProjects(userId)
+                }
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Неизвестная ошибка")
             } finally {
@@ -96,7 +103,7 @@ class ProjectsViewModel(
         viewModelScope.launch {
             try {
                 val userId = currentUserId ?: return@launch
-                repository.createProject(name, userId)
+                repository.createProject(name, userId, workspaceId)
             } catch (e: Exception) {
                 state = ProjectsState.Error(e.message ?: "Ошибка создания проекта")
             }
