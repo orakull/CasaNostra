@@ -63,37 +63,45 @@ class PlayerViewModel(
     var uploadItems = mutableStateListOf<UploadItemState>()
         private set
 
-    fun setProject(project: com.orakull.casanostra.data.models.Project) {
+    fun setProject(project: com.orakull.casanostra.data.models.Project, userId: String = "") {
         _project.value = project
+        _currentUserId = userId
         tracks.clear()
         player.release()
         isLoaded = false
-        
+
         viewModelScope.launch {
             try {
                 trackRepository.fetchTracks(project.id)
                 val repoTracks = trackRepository.tracks.value
                 if (repoTracks.isEmpty()) {
+                    // No tracks — still run eviction so orphaned files are removed
+                    evictStaleCache()
                     isLoaded = true
                 } else {
                     loadProjectTracksIntoPlayer(repoTracks)
                 }
             } catch (e: Exception) {
                 println("SET_PROJECT_ERROR: ${e.message}")
-                isLoaded = true // Stop loader even on error
+                isLoaded = true
             }
         }
     }
+
+    private var _currentUserId: String = ""
 
     private fun loadProjectTracksIntoPlayer(projectTracks: List<com.orakull.casanostra.data.models.ProjectTrack>) {
         viewModelScope.launch {
             try {
                 isLoaded = false
+
+                // Cache-first: each track is served from local cache when available.
+                // Cache misses trigger a download from Supabase and are then stored.
                 val trackInfos = projectTracks.map { pt ->
-                    val bytes = trackRepository.downloadTrackBytes(pt.filePath)
+                    val bytes = trackRepository.getOrDownloadTrackBytes(pt.filePath)
                     com.orakull.casanostra.audio.TrackInfo(name = pt.name, resourceBytes = bytes)
                 }
-                
+
                 player.loadTracks(trackInfos)
 
                 tracks.clear()
@@ -108,10 +116,29 @@ class PlayerViewModel(
 
                 durationMs = player.getDurationMs()
                 isLoaded = true
+
+                // Evict stale cache entries across all projects after tracks are loaded.
+                evictStaleCache()
             } catch (e: Exception) {
                 println("LOAD_TRACKS_ERROR: ${e.message}")
                 e.printStackTrace()
             }
+        }
+    }
+
+    /**
+     * Fetches the set of all valid track filePaths from the backend (all user projects)
+     * and removes from cache any entry that no longer exists on the backend.
+     *
+     * Runs as a best-effort background task — failures are silently swallowed
+     * so they don't affect the main playback flow.
+     */
+    private suspend fun evictStaleCache() {
+        try {
+            val validPaths = trackRepository.fetchAllUserTrackPaths(_currentUserId)
+            trackRepository.evictStaleEntries(validPaths)
+        } catch (e: Exception) {
+            println("EVICT_STALE_CACHE_ERROR (non-fatal): ${e.message}")
         }
     }
 
@@ -181,9 +208,14 @@ class PlayerViewModel(
     private suspend fun uploadSingleFile(projectId: String, index: Int, file: PlatformFile) {
         uploadItems[index] = uploadItems[index].copy(status = UploadStatus.UPLOADING, progress = 0.1f)
         try {
+            // Read bytes once — held in RAM until we know the server-assigned filePath.
             val bytes = file.readBytes()
             uploadItems[index] = uploadItems[index].copy(progress = 0.5f)
+
+            // uploadTrack uploads to Supabase AND caches under the canonical filePath.
+            // After this call the bytes are in cache; the player never re-downloads.
             trackRepository.uploadTrack(projectId, file.name, bytes)
+
             uploadItems[index] = uploadItems[index].copy(status = UploadStatus.DONE, progress = 1f)
         } catch (e: Exception) {
             println("UPLOAD_ERROR[${file.name}]: ${e::class.simpleName}: ${e.message}")

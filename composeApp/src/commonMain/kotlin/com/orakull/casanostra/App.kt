@@ -101,7 +101,8 @@ fun App() {
                             val scope = rememberCoroutineScope()
                             
                             LaunchedEffect(selectedProject) {
-                                selectedProject?.let { playerViewModel.setProject(it) }
+                                val userId = supabaseClient.auth.currentUserOrNull()?.id ?: ""
+                                selectedProject?.let { playerViewModel.setProject(it, userId) }
                             }
 
                             PlayerScreen(
