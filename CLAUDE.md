@@ -44,8 +44,8 @@ Compose UI (Screen) → ViewModel → Repository → Supabase / local cache
 ```
 
 **Key layers:**
-- `ui/theme/` — `DarkThemeColors` (Material3 dark color scheme)
-- `ui/common/` — `LockScreenOrientation` (`expect`/`actual` composable)
+- `ui/theme/` — `CasaNostraTheme`, `CasaNostraLightColors`, `CasaNostraTypography` (Material3 light color scheme)
+- `ui/common/` — `LockScreenOrientation` (`expect`/`actual`), `CasaNostraCard`, `ReadOnlyBadge` (shared UI components)
 - `ui/auth/` — `AuthScreen`, `AuthViewModel`, `AuthState`
 - `ui/projects/` — `ProjectsScreen`, `ProjectsViewModel`, `ProjectsState`
 - `ui/player/` — `PlayerScreen`, `PlayerViewModel`, `TrackRow`, `TrackState`, `UploadItemState`
@@ -91,6 +91,35 @@ Each track has independent volume (0.0–1.0), mute, and solo controls.
 ## Стиль работы
 
 - Описания (`description`) всех вызовов инструмента Bash писать на **русском языке**.
+
+## UI-компоненты: правила повторного использования
+
+### Переиспользуемые компоненты — регистр
+
+Перед написанием inline-кода UI **обязательно проверь** наличие готового компонента:
+
+| Компонент | Файл | Когда использовать |
+|-----------|------|--------------------|
+| `CasaNostraCard` | `ui/common/Components.kt` | Любая кликабельная карточка (воркспейс, проект и т.д.) |
+| `ReadOnlyBadge` | `ui/common/Components.kt` | Везде, где нужно показать режим "Только просмотр" |
+| `MuteSoloSegmentedButton` | `ui/player/MuteSoloButton.kt` | Контрол Mute/Solo на строке трека |
+
+### Правило выноса компонента
+
+Выноси composable в отдельный файл / `ui/common/`, если выполняется **хотя бы одно** условие:
+- Компонент используется (или **может быть использован**) в двух и более экранах
+- Компонент содержит нетривиальную анимацию или сложную логику отображения состояния
+- Компонент представляет собой самостоятельный UI-элемент с чёткой семантикой (Badge, SegmentedButton, EmptyState и т.п.)
+
+### Запрет дублирования
+
+Никогда не копируй одинаковый composable-код между файлами. Если один и тот же визуальный элемент появляется более чем в одном месте — немедленно выноси его в `ui/common/Components.kt` (cross-screen) или в отдельный файл внутри своего пакета (within-feature).
+
+### Именование
+
+- Общие компоненты (cross-screen): `ui/common/Components.kt`
+- Компоненты, специфичные для фичи, но слишком большие для одного файла: отдельный файл в пакете фичи (`ui/player/MuteSoloButton.kt`, `ui/player/UploadProgressOverlay.kt` и т.д.)
+- Имя файла = имя основного composable внутри него
 
 ## Platform-Specific Notes
 

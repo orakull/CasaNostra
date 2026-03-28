@@ -1,7 +1,7 @@
 package com.orakull.casanostra.ui.workspaces
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Link
@@ -21,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.orakull.casanostra.data.models.Workspace
@@ -40,21 +40,63 @@ fun WorkspacesScreen(
 
     Scaffold(
         modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "Мои воркспейсы",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                actions = {
+                    // Avatar with first letter of email
+                    val initial = (viewModel.currentUserEmail ?: "?").first().uppercase()
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = initial,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = "Выйти",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
+            )
+        },
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SmallFloatingActionButton(
                     onClick = { showJoinDialog = true },
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                 ) {
                     Icon(Icons.Filled.Link, "Вступить по ссылке")
                 }
-                FloatingActionButton(
+                ExtendedFloatingActionButton(
                     onClick = { showCreateDialog = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
-                    Icon(Icons.Filled.Add, "Создать воркспейс")
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Создать")
                 }
             }
         }
@@ -65,14 +107,6 @@ fun WorkspacesScreen(
             modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                item {
-                    WorkspacesHeader(
-                        userEmail = viewModel.currentUserEmail ?: "Пользователь",
-                        onLogout = onLogout
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
                 when (val state = viewModel.state) {
                     is WorkspacesState.Loading -> {
                         item {
@@ -93,26 +127,48 @@ fun WorkspacesScreen(
                         }
                     }
                     is WorkspacesState.Success -> {
+                        val owned = state.workspaces.filter { viewModel.isOwner(it) }
+                        val shared = state.workspaces.filter { !viewModel.isOwner(it) }
+
                         if (state.workspaces.isEmpty()) {
                             item {
-                                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                    Text(
-                                        "Нет воркспейсов. Создайте первый!",
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
+                                EmptyState(
+                                    icon = Icons.Filled.Folder,
+                                    title = "Пока пусто",
+                                    subtitle = "Создайте первый воркспейс"
+                                )
+                            }
+                        } else {
+                            if (owned.isNotEmpty()) {
+                                item {
+                                    SectionLabel("Мои")
+                                }
+                                items(owned) { workspace ->
+                                    WorkspaceItem(
+                                        workspace = workspace,
+                                        isOwner = true,
+                                        onShare = { viewModel.generateShareToken(workspace.id, it) },
+                                        onClick = { onWorkspaceSelected(workspace) }
                                     )
                                 }
                             }
-                        } else {
-                            items(state.workspaces) { workspace ->
-                                WorkspaceItem(
-                                    workspace = workspace,
-                                    isOwner = viewModel.isOwner(workspace),
-                                    onShare = { viewModel.generateShareToken(workspace.id, it) },
-                                    onClick = { onWorkspaceSelected(workspace) }
-                                )
+
+                            if (shared.isNotEmpty()) {
+                                item {
+                                    SectionLabel("Общие со мной")
+                                }
+                                items(shared) { workspace ->
+                                    WorkspaceItem(
+                                        workspace = workspace,
+                                        isOwner = false,
+                                        onShare = { viewModel.generateShareToken(workspace.id, it) },
+                                        onClick = { onWorkspaceSelected(workspace) }
+                                    )
+                                }
                             }
                         }
+
+                        item { Spacer(modifier = Modifier.height(80.dp)) }
                     }
                 }
             }
@@ -148,11 +204,65 @@ fun WorkspacesScreen(
     joinError?.let { error ->
         AlertDialog(
             onDismissRequest = { joinError = null },
+            shape = RoundedCornerShape(24.dp),
             title = { Text("Ошибка") },
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { joinError = null }) { Text("OK") }
             }
+        )
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun EmptyState(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .background(
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                    RoundedCornerShape(20.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(36.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
         )
     }
 }
@@ -169,12 +279,16 @@ private fun WorkspaceItem(
     var shareToken by remember { mutableStateOf(workspace.shareToken) }
 
     Card(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -182,26 +296,40 @@ private fun WorkspaceItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                    .size(44.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(12.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(
+                    Icons.Filled.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = workspace.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 if (!isOwner) {
-                    Text(
-                        text = "Shared with you",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text(
+                            text = "Общий",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
             }
             if (isOwner) {
@@ -210,10 +338,17 @@ private fun WorkspaceItem(
                         imageVector = if (shareToken != null) Icons.Filled.Share else Icons.Filled.Lock,
                         contentDescription = "Поделиться",
                         tint = if (shareToken != null) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outlineVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 
@@ -243,6 +378,8 @@ private fun CreateWorkspaceDialog(onCreate: (String) -> Unit, onDismiss: () -> U
     var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         title = { Text("Новый воркспейс") },
         text = {
             OutlinedTextField(
@@ -250,11 +387,14 @@ private fun CreateWorkspaceDialog(onCreate: (String) -> Unit, onDismiss: () -> U
                 onValueChange = { name = it },
                 label = { Text("Название") },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             )
         },
         confirmButton = {
-            Button(onClick = { if (name.isNotBlank()) onCreate(name) }) { Text("Создать") }
+            Button(
+                onClick = { if (name.isNotBlank()) onCreate(name) },
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("Создать") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Отмена") }
@@ -267,6 +407,8 @@ private fun JoinWorkspaceDialog(onJoin: (String) -> Unit, onDismiss: () -> Unit)
     var input by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         title = { Text("Вступить по ссылке") },
         text = {
             OutlinedTextField(
@@ -274,11 +416,14 @@ private fun JoinWorkspaceDialog(onJoin: (String) -> Unit, onDismiss: () -> Unit)
                 onValueChange = { input = it },
                 label = { Text("Ссылка или токен") },
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             )
         },
         confirmButton = {
-            Button(onClick = { if (input.isNotBlank()) onJoin(input) }) { Text("Вступить") }
+            Button(
+                onClick = { if (input.isNotBlank()) onJoin(input) },
+                shape = RoundedCornerShape(16.dp)
+            ) { Text("Вступить") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Отмена") }
@@ -295,6 +440,8 @@ private fun ShareWorkspaceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         title = { Text("Поделиться воркспейсом") },
         text = {
             Text(
@@ -305,7 +452,10 @@ private fun ShareWorkspaceDialog(
             )
         },
         confirmButton = {
-            Button(onClick = if (existingToken != null) onCopy else onGenerate) {
+            Button(
+                onClick = if (existingToken != null) onCopy else onGenerate,
+                shape = RoundedCornerShape(16.dp)
+            ) {
                 Text(if (existingToken != null) "Скопировать ссылку" else "Создать ссылку")
             }
         },
@@ -313,62 +463,4 @@ private fun ShareWorkspaceDialog(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
-}
-
-@Composable
-private fun WorkspacesHeader(userEmail: String, onLogout: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(260.dp)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp)
-            )
-    ) {
-        IconButton(
-            onClick = onLogout,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ExitToApp,
-                contentDescription = "Выйти",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Column(
-            modifier = Modifier.align(Alignment.Center),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
-                    .padding(20.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(56.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = userEmail,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Мои воркспейсы",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
 }

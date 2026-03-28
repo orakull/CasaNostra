@@ -1,22 +1,21 @@
 package com.orakull.casanostra.ui.player
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.foundation.clickable
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 
 @Composable
 fun TrackRow(
@@ -26,113 +25,96 @@ fun TrackRow(
     onMuteToggle: () -> Unit,
     onSoloToggle: () -> Unit,
     onTrackClick: (() -> Unit)? = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    val isMuted = track.isMuted
-    val isSolo = track.isSolo
-
-    Row(
+    Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .then(if (onTrackClick != null) Modifier.clickable { onTrackClick() } else Modifier)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
-        // Track color indicator
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(32.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(track.color)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Верхняя строка: кликабельная (цвет + название + % + M/S)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (onTrackClick != null)
+                            Modifier.clickable { onTrackClick() }
+                        else
+                            Modifier,
+                    )
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Цветовой индикатор
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(28.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(track.color),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                // Название трека
+                Text(
+                    text = track.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Процент громкости — без фиксированной ширины
+                Text(
+                    text = "${(track.volume * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Сегментированный контрол M/S (вынесен в MuteSoloButton.kt)
+                MuteSoloSegmentedButton(
+                    isMuted = track.isMuted,
+                    onMuteToggle = onMuteToggle,
+                    isSolo = track.isSolo,
+                    onSoloToggle = onSoloToggle,
+                )
+            }
 
-        // Info and Volume
-        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                text = track.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Нижняя строка: иконка громкости + слайдер (не кликабельна)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (track.volume == 0f || isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = if (track.volume == 0f || isMuted) "Убавить" else "Увеличить",
+                    imageVector = if (track.volume == 0f || track.isMuted)
+                        Icons.AutoMirrored.Filled.VolumeOff
+                    else
+                        Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Slider(
                     value = track.volume,
                     onValueChange = onVolumeChange,
                     valueRange = 0f..1f,
-                    modifier = Modifier.weight(1f).height(24.dp),
+                    modifier = Modifier.weight(1f).height(20.dp),
                     colors = SliderDefaults.colors(
                         thumbColor = track.color,
                         activeTrackColor = track.color,
-                        inactiveTrackColor = track.color.copy(alpha = 0.2f)
-                    )
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "${(track.volume * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(32.dp)
+                        inactiveTrackColor = track.color.copy(alpha = 0.15f),
+                    ),
                 )
             }
         }
-
-        // Toggles
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LetterToggleButton(
-                text = "M",
-                isActive = isMuted,
-                activeColor = Color(0xFF1976D2),
-                onClick = onMuteToggle
-            )
-
-            LetterToggleButton(
-                text = "S",
-                isActive = isSolo,
-                activeColor = Color(0xFFFFC107),
-                onClick = onSoloToggle
-            )
-        }
-    }
-}
-
-@Composable
-private fun LetterToggleButton(
-    text: String,
-    isActive: Boolean,
-    activeColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(if (isActive) activeColor else MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (isActive) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

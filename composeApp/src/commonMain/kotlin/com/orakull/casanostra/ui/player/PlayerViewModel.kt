@@ -83,14 +83,14 @@ class PlayerViewModel(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val trackColorPool = listOf(
-        androidx.compose.ui.graphics.Color(0xFFEF9A9A), // Soft Red/Pink
-        androidx.compose.ui.graphics.Color(0xFFCE93D8), // Soft Purple
-        androidx.compose.ui.graphics.Color(0xFF81D4FA), // Soft Blue
-        androidx.compose.ui.graphics.Color(0xFF80DEEA), // Soft Cyan
-        androidx.compose.ui.graphics.Color(0xFFA5D6A7), // Soft Green
-        androidx.compose.ui.graphics.Color(0xFFE6EE9C), // Soft Lime
-        androidx.compose.ui.graphics.Color(0xFFFFF59D), // Soft Yellow
-        androidx.compose.ui.graphics.Color(0xFFFFCC80), // Soft Orange
+        androidx.compose.ui.graphics.Color(0xFFC75B39), // Terracotta
+        androidx.compose.ui.graphics.Color(0xFF7B6BA5), // Dusty Purple
+        androidx.compose.ui.graphics.Color(0xFF3D7A8A), // Teal
+        androidx.compose.ui.graphics.Color(0xFF8B7355), // Warm Brown
+        androidx.compose.ui.graphics.Color(0xFF5B8C5A), // Forest Green
+        androidx.compose.ui.graphics.Color(0xFFC49A3C), // Golden Amber
+        androidx.compose.ui.graphics.Color(0xFFA0576E), // Muted Rose
+        androidx.compose.ui.graphics.Color(0xFF4A7A6F), // Dark Sage
     )
 
     fun setProject(project: Project, userId: String = "") {
