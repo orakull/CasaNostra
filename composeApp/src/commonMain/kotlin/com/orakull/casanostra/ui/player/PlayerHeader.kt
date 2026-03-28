@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.orakull.casanostra.ui.common.ReadOnlyBadge
 
 @Composable
 internal fun PlayerToolbar(
@@ -70,6 +71,9 @@ internal fun PlayerToolbar(
                     modifier = Modifier.size(20.dp)
                 )
             }
+        } else {
+            ReadOnlyBadge()
+            Spacer(modifier = Modifier.width(12.dp))
         }
     }
 }

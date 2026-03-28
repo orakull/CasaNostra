@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.orakull.casanostra.data.models.Project
+import com.orakull.casanostra.ui.common.ReadOnlyBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,17 +64,7 @@ fun ProjectsScreen(
                 },
                 actions = {
                     if (isReadOnly) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.tertiaryContainer
-                        ) {
-                            Text(
-                                text = "Только просмотр",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
+                        ReadOnlyBadge()
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                 },
