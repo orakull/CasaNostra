@@ -812,8 +812,8 @@ private fun UploadTrackCard(item: UploadItemState) {
             // Percentage text
             Text(
                 text = when (item.status) {
-                    UploadStatus.DONE -> "✓"
-                    UploadStatus.ERROR -> "✗"
+                    UploadStatus.DONE -> "OK"
+                    UploadStatus.ERROR -> "ERR"
                     else -> "${(item.progress * 100).toInt()}%"
                 },
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
