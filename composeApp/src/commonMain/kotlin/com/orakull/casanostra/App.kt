@@ -14,6 +14,8 @@ import com.orakull.casanostra.data.models.Workspace
 import com.orakull.casanostra.data.repository.ProjectRepository
 import com.orakull.casanostra.data.repository.TrackRepository
 import com.orakull.casanostra.data.repository.WorkspaceRepository
+import com.orakull.casanostra.storage.KEY_PENDING_SHARE_TOKEN
+import com.orakull.casanostra.storage.LocalStorage
 import com.orakull.casanostra.ui.auth.AuthScreen
 import com.orakull.casanostra.ui.auth.AuthState
 import com.orakull.casanostra.ui.auth.AuthViewModel
@@ -22,6 +24,7 @@ import com.orakull.casanostra.ui.player.PlayerViewModel
 import com.orakull.casanostra.ui.projects.ProjectsScreen
 import com.orakull.casanostra.ui.projects.ProjectsViewModel
 import com.orakull.casanostra.ui.theme.CasaNostraTheme
+import com.orakull.casanostra.ui.workspaces.GuestWorkspaceScreen
 import com.orakull.casanostra.ui.workspaces.WorkspacesScreen
 import com.orakull.casanostra.ui.workspaces.WorkspacesViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -29,11 +32,15 @@ import io.github.jan.supabase.auth.auth
 import org.koin.compose.koinInject
 
 @Composable
-fun App() {
+fun App(initialDeepLinkToken: String? = null) {
     CasaNostraTheme {
         val supabaseClient: SupabaseClient = koinInject()
         val authViewModel: AuthViewModel = viewModel { AuthViewModel(supabaseClient) }
         val authState = authViewModel.authState
+
+        // Tracks whether the user tapped "Sign in" from the guest banner —
+        // forces the auth screen even if a token is present
+        var guestDismissed by remember { mutableStateOf(false) }
 
         AnimatedContent(
             targetState = authState,
@@ -47,10 +54,37 @@ fun App() {
                 }
 
                 is AuthState.NotAuthenticated -> {
-                    AuthScreen(viewModel = authViewModel)
+                    if (initialDeepLinkToken != null && !guestDismissed) {
+                        GuestWorkspaceScreen(
+                            token = initialDeepLinkToken,
+                            onSignIn = { guestDismissed = true }
+                        )
+                    } else {
+                        AuthScreen(viewModel = authViewModel)
+                    }
                 }
 
                 is AuthState.Authenticated -> {
+                    val workspaceRepository = koinInject<WorkspaceRepository>()
+
+                    // Auto-join: when a user signs in/registers and there's a pending share token,
+                    // automatically join that workspace (if not already a member and not the owner).
+                    LaunchedEffect(initialDeepLinkToken) {
+                        val token = initialDeepLinkToken ?: return@LaunchedEffect
+                        val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return@LaunchedEffect
+                        try {
+                            val workspace = workspaceRepository.findByShareToken(token)
+                            if (workspace != null && workspace.ownerId != userId) {
+                                val alreadyJoined = workspaceRepository.workspaces.value.any { it.id == workspace.id }
+                                if (!alreadyJoined) {
+                                    workspaceRepository.joinWorkspace(workspace.id, userId)
+                                }
+                            }
+                        } finally {
+                            LocalStorage.remove(KEY_PENDING_SHARE_TOKEN)
+                        }
+                    }
+
                     var currentScreen by remember { mutableStateOf("workspaces") }
                     var selectedWorkspace by remember { mutableStateOf<Workspace?>(null) }
                     var selectedProject by remember { mutableStateOf<Project?>(null) }
@@ -72,7 +106,6 @@ fun App() {
                         when (screen) {
                             "workspaces" -> {
                                 val userId = supabaseClient.auth.currentUserOrNull()?.id ?: "guest"
-                                val workspaceRepository = koinInject<WorkspaceRepository>()
                                 val projectRepository = koinInject<ProjectRepository>()
                                 val workspacesViewModel: WorkspacesViewModel = viewModel(key = userId) {
                                     WorkspacesViewModel(workspaceRepository, supabaseClient)

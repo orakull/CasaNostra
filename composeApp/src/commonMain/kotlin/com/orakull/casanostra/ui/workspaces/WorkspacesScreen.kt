@@ -358,13 +358,13 @@ private fun WorkspaceItem(
             onGenerate = {
                 onShare { token ->
                     shareToken = token
-                    clipboard.setText(AnnotatedString("casanostra://workspace/$token"))
+                    clipboard.setText(AnnotatedString("https://casanostra.orakull.ru/workspace/$token"))
                     showShareDialog = false
                 }
             },
             onCopy = {
                 shareToken?.let { token ->
-                    clipboard.setText(AnnotatedString("casanostra://workspace/$token"))
+                    clipboard.setText(AnnotatedString("https://casanostra.orakull.ru/workspace/$token"))
                 }
                 showShareDialog = false
             },

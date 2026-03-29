@@ -1,0 +1,10 @@
+services:
+  casanostra-web:
+    image: ghcr.io/orakull/casanostra:latest
+    container_name: casanostra-web
+    restart: unless-stopped
+    ports:
+      # Bind only to loopback — external access goes through host nginx proxy
+      - "127.0.0.1:8081:80"
+    labels:
+      - "com.orakull.service=casanostra"
