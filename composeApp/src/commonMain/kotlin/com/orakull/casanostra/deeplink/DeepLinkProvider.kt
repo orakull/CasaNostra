@@ -10,3 +10,11 @@ package com.orakull.casanostra.deeplink
  * Returns null if the app was not opened via a workspace share link.
  */
 expect fun getInitialDeepLinkToken(): String?
+
+/**
+ * Returns the base URL of the current app host (origin without trailing slash).
+ *
+ * Web: window.location.origin (e.g. "http://localhost:8080" or "https://casanostra.orakull.ru")
+ * Android/iOS: hardcoded production URL.
+ */
+expect fun getAppBaseUrl(): String

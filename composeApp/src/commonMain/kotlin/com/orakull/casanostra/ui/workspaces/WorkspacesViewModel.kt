@@ -144,10 +144,10 @@ class WorkspacesViewModel(
 
     private fun extractToken(input: String): String? {
         val trimmed = input.trim()
-        // Новый формат: https://casanostra.orakull.ru/workspace/{token}
-        val httpsPrefix = "https://casanostra.orakull.ru/workspace/"
-        if (trimmed.startsWith(httpsPrefix)) {
-            return trimmed.removePrefix(httpsPrefix).trimEnd('/').takeIf { it.isNotBlank() }
+        // Любой URL с path /workspace/{token} (prod, localhost, etc.)
+        val segment = "/workspace/"
+        if (trimmed.contains(segment)) {
+            return trimmed.substringAfterLast(segment).trimEnd('/').takeIf { it.isNotBlank() }
         }
         // Устаревший формат: casanostra://workspace/{token}
         val legacyPrefix = "casanostra://workspace/"

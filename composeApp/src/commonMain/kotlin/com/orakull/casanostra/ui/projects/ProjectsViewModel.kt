@@ -54,15 +54,15 @@ class ProjectsViewModel(
                 state = ProjectsState.Loading
             }
             try {
-                val userId = supabaseClient.auth.currentUserOrNull()?.id
-                if (userId == null) {
-                    state = ProjectsState.Error("Пользователь не авторизован")
-                    return@launch
-                }
-
                 if (workspaceId != null) {
+                    // Гостевой режим: авторизация не нужна
                     repository.fetchProjectsByWorkspace(workspaceId)
                 } else {
+                    val userId = supabaseClient.auth.currentUserOrNull()?.id
+                    if (userId == null) {
+                        state = ProjectsState.Error("Пользователь не авторизован")
+                        return@launch
+                    }
                     repository.fetchProjects(userId)
                 }
 
@@ -78,15 +78,14 @@ class ProjectsViewModel(
         viewModelScope.launch {
             isRefreshing = true
             try {
-                val userId = currentUserId
-                if (userId == null) {
-                    state = ProjectsState.Error("Пользователь не авторизован")
-                    return@launch
-                }
-
                 if (workspaceId != null) {
                     repository.fetchProjectsByWorkspace(workspaceId)
                 } else {
+                    val userId = currentUserId
+                    if (userId == null) {
+                        state = ProjectsState.Error("Пользователь не авторизован")
+                        return@launch
+                    }
                     repository.fetchProjects(userId)
                 }
             } catch (e: Exception) {

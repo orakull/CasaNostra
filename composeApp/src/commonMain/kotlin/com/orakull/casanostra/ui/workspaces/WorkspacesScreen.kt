@@ -25,6 +25,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.orakull.casanostra.data.models.Workspace
+import com.orakull.casanostra.deeplink.getAppBaseUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -358,13 +359,13 @@ private fun WorkspaceItem(
             onGenerate = {
                 onShare { token ->
                     shareToken = token
-                    clipboard.setText(AnnotatedString("https://casanostra.orakull.ru/workspace/$token"))
+                    clipboard.setText(AnnotatedString("${getAppBaseUrl()}/workspace/$token"))
                     showShareDialog = false
                 }
             },
             onCopy = {
                 shareToken?.let { token ->
-                    clipboard.setText(AnnotatedString("https://casanostra.orakull.ru/workspace/$token"))
+                    clipboard.setText(AnnotatedString("${getAppBaseUrl()}/workspace/$token"))
                 }
                 showShareDialog = false
             },

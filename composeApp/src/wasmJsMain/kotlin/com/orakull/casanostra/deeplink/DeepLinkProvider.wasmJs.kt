@@ -11,3 +11,5 @@ actual fun getInitialDeepLinkToken(): String? {
         null
     }
 }
+
+actual fun getAppBaseUrl(): String = window.location.origin
