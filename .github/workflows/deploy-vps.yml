@@ -66,6 +66,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            deploy
+            docker-compose.yml
+
+      - name: Copy deploy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy/nginx-host.conf,docker-compose.yml"
+          target: /opt/casanostra
+          overwrite: true
+
       - name: SSH deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -74,6 +90,13 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /opt/casanostra
+
+            # Configure host nginx reverse proxy (idempotent)
+            sudo cp deploy/nginx-host.conf /etc/nginx/sites-available/casanostra
+            sudo ln -sf /etc/nginx/sites-available/casanostra /etc/nginx/sites-enabled/casanostra
+            sudo nginx -t && sudo systemctl reload nginx
+
+            # Pull and restart container
             docker compose pull casanostra-web
             docker compose up -d casanostra-web
             docker image prune -f
