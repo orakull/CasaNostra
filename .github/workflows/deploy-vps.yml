@@ -42,6 +42,12 @@ jobs:
       - name: Build WasmJs distribution
         run: ./gradlew :composeApp:wasmJsBrowserDistribution
 
+      - name: Inject build version into index.html
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          sed -i "s|src=\"composeApp.js\"|src=\"composeApp.js?v=$VERSION\"|" \
+            composeApp/build/dist/wasmJs/productionExecutable/index.html
+
       - name: Prepare dist/ for Docker build
         run: cp -r composeApp/build/dist/wasmJs/productionExecutable dist
 

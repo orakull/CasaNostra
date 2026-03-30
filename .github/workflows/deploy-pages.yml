@@ -40,6 +40,12 @@ jobs:
           sed -i 's|<base href="/">|<base href="/CasaNostra/">|' \
             composeApp/build/dist/wasmJs/productionExecutable/index.html
 
+      - name: Inject build version into index.html
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          sed -i "s|src=\"composeApp.js\"|src=\"composeApp.js?v=$VERSION\"|" \
+            composeApp/build/dist/wasmJs/productionExecutable/index.html
+
       - name: Add SPA fallback for GitHub Pages
         run: |
           cp composeApp/build/dist/wasmJs/productionExecutable/index.html \
