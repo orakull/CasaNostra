@@ -35,6 +35,11 @@ jobs:
       - name: Disable Jekyll
         run: touch composeApp/build/dist/wasmJs/productionExecutable/.nojekyll
 
+      - name: Fix base path for GitHub Pages
+        run: |
+          sed -i 's|<base href="/">|<base href="/CasaNostra/">|' \
+            composeApp/build/dist/wasmJs/productionExecutable/index.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
