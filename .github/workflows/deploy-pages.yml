@@ -40,6 +40,11 @@ jobs:
           sed -i 's|<base href="/">|<base href="/CasaNostra/">|' \
             composeApp/build/dist/wasmJs/productionExecutable/index.html
 
+      - name: Add SPA fallback for GitHub Pages
+        run: |
+          cp composeApp/build/dist/wasmJs/productionExecutable/index.html \
+             composeApp/build/dist/wasmJs/productionExecutable/404.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
