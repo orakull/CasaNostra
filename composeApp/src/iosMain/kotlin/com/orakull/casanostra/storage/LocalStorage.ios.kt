@@ -1,8 +1,11 @@
 package com.orakull.casanostra.storage
 
-// TODO: Implement using NSUserDefaults for iOS.
+import platform.Foundation.NSUserDefaults
+
 actual object LocalStorage {
-    actual fun get(key: String): String? = null
-    actual fun set(key: String, value: String) {}
-    actual fun remove(key: String) {}
+    private val defaults = NSUserDefaults.standardUserDefaults
+
+    actual fun get(key: String): String? = defaults.stringForKey(key)
+    actual fun set(key: String, value: String) { defaults.setObject(value, key) }
+    actual fun remove(key: String) { defaults.removeObjectForKey(key) }
 }

@@ -13,6 +13,8 @@ import com.orakull.casanostra.data.models.Project
 import com.orakull.casanostra.data.models.ProjectTrack
 import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
+import com.orakull.casanostra.storage.SavedTrackSettings
+import com.orakull.casanostra.storage.TrackSettingsStorage
 import io.github.vinceglb.filekit.core.PlatformFile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -129,15 +131,28 @@ class PlayerViewModel(
 
                 player.loadTracks(trackInfos)
 
+                val savedSettings = _project.value?.id
+                    ?.let { TrackSettingsStorage.load(it) }
+                    ?: emptyMap()
+
                 tracks.clear()
                 projectTracks.forEachIndexed { index, pt ->
+                    val saved = savedSettings[pt.id]
                     tracks.add(
                         TrackState(
                             name = pt.name,
+                            volume = saved?.volume ?: 1.0f,
+                            isMuted = saved?.isMuted ?: false,
+                            isSolo = saved?.isSolo ?: false,
                             color = trackColorPool[index % trackColorPool.size]
                         )
                     )
                 }
+
+                tracks.forEachIndexed { index, ts ->
+                    player.setTrackVolume(index, ts.volume)
+                }
+                updateEffectiveMutes()
 
                 durationMs = player.getDurationMs()
                 isLoaded = true
@@ -179,6 +194,7 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 repository.deleteProject(project.id)
+                TrackSettingsStorage.remove(project.id)
                 _project.value = null
                 onSuccess()
             } catch (e: Exception) {
@@ -316,6 +332,7 @@ class PlayerViewModel(
         if (trackIndex !in tracks.indices) return
         tracks[trackIndex] = tracks[trackIndex].copy(volume = volume)
         player.setTrackVolume(trackIndex, volume)
+        persistTrackSettings()
     }
 
     fun toggleMute(trackIndex: Int) {
@@ -323,6 +340,7 @@ class PlayerViewModel(
         val newMuted = !tracks[trackIndex].isMuted
         tracks[trackIndex] = tracks[trackIndex].copy(isMuted = newMuted)
         updateEffectiveMutes()
+        persistTrackSettings()
     }
 
     fun toggleSolo(trackIndex: Int) {
@@ -330,6 +348,17 @@ class PlayerViewModel(
         val newSolo = !tracks[trackIndex].isSolo
         tracks[trackIndex] = tracks[trackIndex].copy(isSolo = newSolo)
         updateEffectiveMutes()
+        persistTrackSettings()
+    }
+
+    private fun persistTrackSettings() {
+        val projectId = _project.value?.id ?: return
+        val projectTracks = projectTracks.value
+        if (projectTracks.size != tracks.size) return
+        val settings = projectTracks.zip(tracks).associate { (pt, ts) ->
+            pt.id to SavedTrackSettings(ts.volume, ts.isMuted, ts.isSolo)
+        }
+        TrackSettingsStorage.save(projectId, settings)
     }
 
     private fun updateEffectiveMutes() {
