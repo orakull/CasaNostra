@@ -212,8 +212,11 @@ Before writing any inline UI code, **check whether a ready-made component alread
 |-----------|------|-------------|
 | `CasaNostraCard` | `ui/common/Components.kt` | Any clickable card (workspace, project, etc.) |
 | `ReadOnlyBadge` | `ui/common/Components.kt` | Wherever read-only mode needs to be indicated |
+| `ErrorRetryContent` | `ui/common/Components.kt` | Full-screen error state with Retry button |
 | `MuteSoloSegmentedButton` | `ui/player/MuteSoloButton.kt` | Mute/Solo control on a track row |
 | `UploadProgressOverlay` | `ui/player/UploadProgressOverlay.kt` | Track upload progress display in PlayerScreen |
+| `DownloadProgressOverlay` | `ui/player/DownloadProgressOverlay.kt` | Per-track download progress during initial project load |
+| `FileTransferTrackCard` | `ui/player/FileTransferState.kt` | Single track row inside upload/download progress overlays |
 
 ### When to Extract a Component
 
