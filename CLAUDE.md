@@ -180,6 +180,28 @@ Versions are declared in `gradle/libs.versions.toml`. Always use the version cat
 
 - Write all Bash tool call `description` parameters in **Russian**.
 
+## Keeping This File Up to Date
+
+**Update `CLAUDE.md` whenever you make a significant code change.** Significant changes include:
+
+- Adding a new screen, ViewModel, or feature package
+- Adding a new `expect`/`actual` abstraction
+- Adding or removing a repository, DI singleton, or storage layer
+- Extracting or creating a reusable UI component (update the Component Registry table)
+- Adding a new Supabase table, column, or RLS policy
+- Changing the app navigation flow
+- Adding a new library dependency (update the Key Library Versions table)
+- Adding or modifying a CI/CD workflow
+
+**What to update:**
+- The relevant architecture bullet(s) in the Architecture section
+- The App Navigation section if the screen flow changes
+- The Component Registry table if a new shared component is added
+- The Key Library Versions table if a library is added or its version changes
+- Any dedicated section (Storage, Deep Linking, CI/CD, etc.) that describes the changed subsystem
+
+Keeping this file accurate is as important as keeping the code correct — stale documentation misleads future AI sessions.
+
 ## UI Components: Reuse Rules
 
 ### Component Registry
