@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.orakull.casanostra.data.models.Workspace
 import com.orakull.casanostra.deeplink.getAppBaseUrl
+import com.orakull.casanostra.ui.common.AppError
+import com.orakull.casanostra.ui.common.ErrorAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +39,7 @@ fun WorkspacesScreen(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
-    var joinError by remember { mutableStateOf<String?>(null) }
+    var joinError by remember { mutableStateOf<AppError?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -116,17 +118,6 @@ fun WorkspacesScreen(
                             }
                         }
                     }
-                    is WorkspacesState.Error -> {
-                        item {
-                            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text(
-                                    "Ошибка: ${state.message}",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
                     is WorkspacesState.Success -> {
                         val owned = state.workspaces.filter { viewModel.isOwner(it) }
                         val shared = state.workspaces.filter { !viewModel.isOwner(it) }
@@ -192,8 +183,8 @@ fun WorkspacesScreen(
                 viewModel.joinByToken(
                     input = input,
                     onSuccess = { showJoinDialog = false },
-                    onError = { msg ->
-                        joinError = msg
+                    onError = { appError ->
+                        joinError = appError
                         showJoinDialog = false
                     }
                 )
@@ -202,14 +193,22 @@ fun WorkspacesScreen(
         )
     }
 
+    // Ошибка вступления по токену — ErrorAlertDialog
     joinError?.let { error ->
-        AlertDialog(
-            onDismissRequest = { joinError = null },
-            shape = RoundedCornerShape(24.dp),
-            title = { Text("Ошибка") },
-            text = { Text(error) },
-            confirmButton = {
-                TextButton(onClick = { joinError = null }) { Text("OK") }
+        ErrorAlertDialog(
+            error = error,
+            onDismiss = { joinError = null }
+        )
+    }
+
+    // Ошибки ViewModel — AlertDialog поверх контента
+    viewModel.overlayError?.let { error ->
+        ErrorAlertDialog(
+            error = error,
+            onDismiss = { viewModel.clearOverlayError() },
+            onRetry = {
+                viewModel.clearOverlayError()
+                viewModel.loadWorkspaces()
             }
         )
     }

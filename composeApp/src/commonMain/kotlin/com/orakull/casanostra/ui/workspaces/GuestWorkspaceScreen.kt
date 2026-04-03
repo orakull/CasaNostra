@@ -16,6 +16,7 @@ import com.orakull.casanostra.data.repository.TrackRepository
 import com.orakull.casanostra.data.repository.WorkspaceRepository
 import com.orakull.casanostra.ui.player.PlayerScreen
 import com.orakull.casanostra.ui.player.PlayerViewModel
+import com.orakull.casanostra.ui.common.ErrorAlertDialog
 import com.orakull.casanostra.ui.projects.ProjectsScreen
 import com.orakull.casanostra.ui.projects.ProjectsViewModel
 import io.github.jan.supabase.SupabaseClient
@@ -64,9 +65,19 @@ fun GuestWorkspaceScreen(
                 }
 
                 viewModel.error != null -> {
-                    GuestErrorContent(
-                        message = viewModel.error!!,
-                        onSignIn = onSignIn
+                    // Заглушка (пустой экран) + ErrorAlertDialog поверх
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Воркспейс недоступен",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    ErrorAlertDialog(
+                        error = viewModel.error!!,
+                        onDismiss = onSignIn,
+                        onRetry = { viewModel.loadByToken(token) },
+                        title = "Не удалось открыть воркспейс"
                     )
                 }
 
@@ -164,22 +175,3 @@ private fun GuestSignInBanner(onSignIn: () -> Unit) {
     }
 }
 
-@Composable
-private fun GuestErrorContent(message: String, onSignIn: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Button(onClick = onSignIn, shape = MaterialTheme.shapes.large) {
-                Text("Войти")
-            }
-        }
-    }
-}

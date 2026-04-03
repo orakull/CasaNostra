@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.orakull.casanostra.ui.common.AppError
 
 enum class TransferStatus { PENDING, IN_PROGRESS, DONE, ERROR }
 
@@ -24,7 +25,8 @@ data class FileTransferItemState(
     val name: String,
     val status: TransferStatus = TransferStatus.PENDING,
     val progress: Float = 0f,
-    val errorMessage: String? = null
+    /** Структурированная ошибка: user-friendly сообщение + сырая техническая деталь. */
+    val error: AppError? = null
 )
 
 @Composable
@@ -102,10 +104,11 @@ internal fun FileTransferTrackCard(item: FileTransferItemState) {
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     )
                 }
-                if (item.status == TransferStatus.ERROR && item.errorMessage != null) {
+                // Показываем user-friendly сообщение, а не сырую ошибку
+                if (item.status == TransferStatus.ERROR && item.error != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = item.errorMessage,
+                        text = item.error.userMessage,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                         maxLines = 2,

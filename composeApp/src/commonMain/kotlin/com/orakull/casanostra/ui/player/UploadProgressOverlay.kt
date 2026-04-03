@@ -22,7 +22,7 @@ private fun UploadItemState.toTransferItem() = FileTransferItemState(
         UploadStatus.ERROR     -> TransferStatus.ERROR
     },
     progress = progress,
-    errorMessage = errorMessage
+    error = error
 )
 
 @Composable

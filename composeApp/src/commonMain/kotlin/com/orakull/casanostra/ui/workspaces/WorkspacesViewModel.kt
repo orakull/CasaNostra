@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.orakull.casanostra.data.models.Workspace
 import com.orakull.casanostra.data.repository.WorkspaceRepository
+import com.orakull.casanostra.ui.common.AppError
+import com.orakull.casanostra.ui.common.toAppError
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
@@ -14,7 +16,6 @@ import kotlinx.coroutines.launch
 sealed class WorkspacesState {
     data object Loading : WorkspacesState()
     data class Success(val workspaces: List<Workspace>) : WorkspacesState()
-    data class Error(val message: String) : WorkspacesState()
 }
 
 class WorkspacesViewModel(
@@ -28,6 +29,13 @@ class WorkspacesViewModel(
     var isRefreshing by mutableStateOf(false)
         private set
 
+    /**
+     * Ошибка, отображаемая в AlertDialog поверх текущего контента.
+     * Контент (список воркспейсов или заглушка) остаётся видимым.
+     */
+    var overlayError by mutableStateOf<AppError?>(null)
+        private set
+
     val currentUserEmail: String?
         get() = supabaseClient.auth.currentUserOrNull()?.email
 
@@ -37,9 +45,7 @@ class WorkspacesViewModel(
     init {
         viewModelScope.launch {
             repository.workspaces.collect { workspaces ->
-                if (state !is WorkspacesState.Error || workspaces.isNotEmpty()) {
-                    state = WorkspacesState.Success(workspaces)
-                }
+                state = WorkspacesState.Success(workspaces)
             }
         }
         loadWorkspaces()
@@ -53,13 +59,20 @@ class WorkspacesViewModel(
             try {
                 val userId = currentUserId
                 if (userId == null) {
-                    state = WorkspacesState.Error("Пользователь не авторизован")
+                    overlayError = AppError(
+                        userMessage = "Вы не авторизованы. Войдите в аккаунт.",
+                        technicalDetail = "currentUserOrNull() returned null"
+                    )
+                    state = WorkspacesState.Success(emptyList())
                     return@launch
                 }
                 repository.fetchWorkspaces(userId)
                 state = WorkspacesState.Success(repository.workspaces.value)
             } catch (e: Exception) {
-                state = WorkspacesState.Error(e.message ?: "Неизвестная ошибка")
+                overlayError = e.toAppError("Не удалось загрузить воркспейсы")
+                if (state is WorkspacesState.Loading) {
+                    state = WorkspacesState.Success(emptyList())
+                }
             }
         }
     }
@@ -72,7 +85,7 @@ class WorkspacesViewModel(
                 val userId = currentUserId ?: return@launch
                 repository.fetchWorkspaces(userId)
             } catch (e: Exception) {
-                state = WorkspacesState.Error(e.message ?: "Неизвестная ошибка")
+                overlayError = e.toAppError("Не удалось обновить воркспейсы")
             } finally {
                 isRefreshing = false
             }
@@ -86,7 +99,7 @@ class WorkspacesViewModel(
                 val userId = currentUserId ?: return@launch
                 repository.createWorkspace(name, userId)
             } catch (e: Exception) {
-                state = WorkspacesState.Error(e.message ?: "Ошибка создания воркспейса")
+                overlayError = e.toAppError("Не удалось создать воркспейс")
             }
         }
     }
@@ -97,44 +110,56 @@ class WorkspacesViewModel(
                 val token = repository.generateShareToken(workspaceId)
                 onToken(token)
             } catch (e: Exception) {
-                state = WorkspacesState.Error(e.message ?: "Ошибка генерации ссылки")
+                overlayError = e.toAppError("Не удалось создать ссылку для приглашения")
             }
         }
     }
 
-    // Вступить в воркспейс по токену или полной ссылке
-    fun joinByToken(input: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun joinByToken(input: String, onSuccess: () -> Unit, onError: (AppError) -> Unit) {
         val token = extractToken(input)
         if (token == null) {
-            onError("Неверный формат ссылки или токена")
+            onError(AppError(
+                userMessage = "Неверный формат ссылки или токена",
+                technicalDetail = "extractToken() returned null for input: \"$input\""
+            ))
             return
         }
         viewModelScope.launch {
             try {
                 val workspace = repository.findByShareToken(token)
                 if (workspace == null) {
-                    onError("Воркспейс не найден")
+                    onError(AppError(
+                        userMessage = "Воркспейс не найден",
+                        technicalDetail = "findByShareToken() returned null for token: $token"
+                    ))
                     return@launch
                 }
                 val userId = currentUserId ?: run {
-                    onError("Необходима авторизация")
+                    onError(AppError(
+                        userMessage = "Необходима авторизация",
+                        technicalDetail = "currentUserOrNull() returned null"
+                    ))
                     return@launch
                 }
-                // Не вступаем в собственный воркспейс
                 if (workspace.ownerId == userId) {
-                    onError("Это ваш собственный воркспейс")
+                    onError(AppError(
+                        userMessage = "Это ваш собственный воркспейс",
+                        technicalDetail = "workspace.ownerId == currentUserId (${userId})"
+                    ))
                     return@launch
                 }
-                // Не вступаем повторно
                 val alreadyJoined = repository.workspaces.value.any { it.id == workspace.id }
                 if (alreadyJoined) {
-                    onError("Вы уже в этом воркспейсе")
+                    onError(AppError(
+                        userMessage = "Вы уже состоите в этом воркспейсе",
+                        technicalDetail = "workspace ${workspace.id} already present in local list"
+                    ))
                     return@launch
                 }
                 repository.joinWorkspace(workspace.id, userId)
                 onSuccess()
             } catch (e: Exception) {
-                onError(e.message ?: "Ошибка при вступлении")
+                onError(e.toAppError("Не удалось вступить в воркспейс"))
             }
         }
     }
@@ -142,19 +167,18 @@ class WorkspacesViewModel(
     fun isOwner(workspace: Workspace): Boolean =
         workspace.ownerId == currentUserId
 
+    fun clearOverlayError() { overlayError = null }
+
     private fun extractToken(input: String): String? {
         val trimmed = input.trim()
-        // Любой URL с path /workspace/{token} (prod, localhost, etc.)
         val segment = "/workspace/"
         if (trimmed.contains(segment)) {
             return trimmed.substringAfterLast(segment).trimEnd('/').takeIf { it.isNotBlank() }
         }
-        // Устаревший формат: casanostra://workspace/{token}
         val legacyPrefix = "casanostra://workspace/"
         if (trimmed.startsWith(legacyPrefix)) {
             return trimmed.removePrefix(legacyPrefix).takeIf { it.isNotBlank() }
         }
-        // Голый UUID
         return trimmed.takeIf { it.isNotBlank() }
     }
 }

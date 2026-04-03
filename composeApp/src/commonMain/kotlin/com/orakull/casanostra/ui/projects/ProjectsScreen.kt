@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.orakull.casanostra.data.models.Project
+import com.orakull.casanostra.ui.common.ErrorAlertDialog
 import com.orakull.casanostra.ui.common.ReadOnlyBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,10 +57,7 @@ fun ProjectsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onLogout) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 },
                 actions = {
@@ -96,17 +94,6 @@ fun ProjectsScreen(
                         item {
                             Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator()
-                            }
-                        }
-                    }
-                    is ProjectsState.Error -> {
-                        item {
-                            Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text(
-                                    "Ошибка: ${state.message}",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
                             }
                         }
                     }
@@ -154,12 +141,23 @@ fun ProjectsScreen(
                                 ProjectItem(project, onClick = { onProjectSelected(project) })
                             }
                         }
-
                         item { Spacer(modifier = Modifier.height(80.dp)) }
                     }
                 }
             }
         }
+    }
+
+    // Ошибка в AlertDialog — данные/заглушка остаются видимыми за диалогом
+    viewModel.overlayError?.let { error ->
+        ErrorAlertDialog(
+            error = error,
+            onDismiss = { viewModel.clearOverlayError() },
+            onRetry = {
+                viewModel.clearOverlayError()
+                viewModel.loadProjects()
+            }
+        )
     }
 
     if (showCreateDialog) {

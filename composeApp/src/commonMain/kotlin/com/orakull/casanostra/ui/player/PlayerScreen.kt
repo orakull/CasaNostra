@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import com.orakull.casanostra.ui.common.ErrorRetryContent
+import com.orakull.casanostra.ui.common.ErrorAlertDialog
 import com.orakull.casanostra.ui.common.LockScreenOrientation
 import com.orakull.casanostra.ui.common.ScreenOrientation
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
@@ -40,22 +40,14 @@ fun PlayerScreen(
     val tracks = viewModel.tracks
     val isLoaded = viewModel.isLoaded
     val loadError = viewModel.loadError
+    val actionError = viewModel.actionError
     val downloadItems = viewModel.downloadItems
     val project by viewModel.project.collectAsState()
     val projectTracks by viewModel.projectTracks.collectAsState()
     val isUploading = viewModel.isUploading
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(viewModel.actionError) {
-        viewModel.actionError?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearActionError()
-        }
-    }
-
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
-
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
     var selectedTrackFilePath by remember { mutableStateOf<String?>(null) }
     var showTrackEditDialog by remember { mutableStateOf(false) }
@@ -66,13 +58,10 @@ fun PlayerScreen(
         mode = PickerMode.Multiple(),
         title = "Выберите аудиофайлы"
     ) { files ->
-        files?.takeIf { it.isNotEmpty() }?.let {
-            viewModel.uploadMultipleAudio(it)
-        }
+        files?.takeIf { it.isNotEmpty() }?.let { viewModel.uploadMultipleAudio(it) }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (isLoaded && loadError == null && !isReadOnly) {
                 FloatingActionButton(
@@ -93,31 +82,46 @@ fun PlayerScreen(
         ) {
             when {
                 !isLoaded && loadError == null && downloadItems.isEmpty() -> {
-                    // Метаданные ещё грузятся — generic spinner
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
                 }
 
                 !isLoaded && downloadItems.isNotEmpty() -> {
-                    // Per-track прогресс загрузки из Supabase
                     DownloadProgressOverlay(
                         items = downloadItems,
                         onRetry = { viewModel.retryLoadTracks() }
                     )
                 }
 
+                // Ошибка загрузки: показываем заглушку + ErrorAlertDialog
                 loadError != null -> {
-                    // Ошибка загрузки с кнопкой Retry
-                    ErrorRetryContent(
-                        message = loadError,
-                        onRetry = { viewModel.retryLoadTracks() }
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Filled.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.outlineVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Дорожки недоступны",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    ErrorAlertDialog(
+                        error = loadError,
+                        onDismiss = { viewModel.retryLoadTracks() },
+                        onRetry = { viewModel.retryLoadTracks() },
+                        title = "Ошибка загрузки"
                     )
                 }
 
                 else -> {
-                    // Контент загружен — обернуть в PullToRefreshBox
                     PullToRefreshBox(
                         isRefreshing = viewModel.isRefreshing,
                         onRefresh = { viewModel.refreshTracks() },
@@ -275,7 +279,15 @@ fun PlayerScreen(
                 }
             }
 
-            // Dialogs
+            // Ошибка мутации — контент остаётся видимым, диалог поверх
+            if (actionError != null) {
+                ErrorAlertDialog(
+                    error = actionError,
+                    onDismiss = { viewModel.clearActionError() }
+                )
+            }
+
+            // Диалоги редактирования
             if (isEditingName) {
                 var newName by remember { mutableStateOf(project?.name ?: "") }
                 val focusRequester = remember { FocusRequester() }
@@ -294,9 +306,7 @@ fun PlayerScreen(
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.focusRequester(focusRequester)
                         )
-                        LaunchedEffect(Unit) {
-                            focusRequester.requestFocus()
-                        }
+                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
                     },
                     confirmButton = {
                         Button(
@@ -307,14 +317,10 @@ fun PlayerScreen(
                                 }
                             },
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Сохранить")
-                        }
+                        ) { Text("Сохранить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { isEditingName = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { isEditingName = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -325,7 +331,7 @@ fun PlayerScreen(
                     shape = RoundedCornerShape(24.dp),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     title = { Text("Удалить проект?") },
-                    text = { Text("Проект \"${project?.name ?: ""}\" будет удален безвозвратно. Это действие нельзя отменить.") },
+                    text = { Text("Проект \"${project?.name ?: ""}\" будет удалён безвозвратно.") },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -334,14 +340,10 @@ fun PlayerScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Удалить")
-                        }
+                        ) { Text("Удалить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteConfirmation = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showDeleteConfirmation = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -366,9 +368,7 @@ fun PlayerScreen(
                                 shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.focusRequester(focusRequester).fillMaxWidth()
                             )
-                            LaunchedEffect(Unit) {
-                                focusRequester.requestFocus()
-                            }
+                            LaunchedEffect(Unit) { focusRequester.requestFocus() }
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = {
@@ -381,7 +381,7 @@ fun PlayerScreen(
                                 shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Outlined.Delete, contentDescription = "Удалить трек")
+                                Icon(Icons.Outlined.Delete, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Удалить трек из проекта")
                             }
@@ -396,14 +396,10 @@ fun PlayerScreen(
                                 showTrackEditDialog = false
                             },
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Сохранить")
-                        }
+                        ) { Text("Сохранить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showTrackEditDialog = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showTrackEditDialog = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -425,20 +421,15 @@ fun PlayerScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Удалить")
-                        }
+                        ) { Text("Удалить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showTrackDeleteDialog = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showTrackDeleteDialog = false }) { Text("Отмена") }
                     }
                 )
             }
         }
 
-        // Upload Progress Overlay
         if (isUploading) {
             UploadProgressOverlay(
                 uploadItems = viewModel.uploadItems,
