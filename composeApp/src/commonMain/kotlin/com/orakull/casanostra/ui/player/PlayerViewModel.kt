@@ -15,6 +15,8 @@ import com.orakull.casanostra.audio.MultitrackPlayer
 import com.orakull.casanostra.audio.TrackInfo
 import com.orakull.casanostra.storage.SavedTrackSettings
 import com.orakull.casanostra.storage.TrackSettingsStorage
+import com.orakull.casanostra.ui.common.AppError
+import com.orakull.casanostra.ui.common.toAppError
 import io.github.vinceglb.filekit.core.PlatformFile
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -33,7 +35,7 @@ data class UploadItemState(
     val file: PlatformFile,
     val status: UploadStatus = UploadStatus.PENDING,
     val progress: Float = 0f,
-    val errorMessage: String? = null
+    val error: AppError? = null
 )
 
 data class TrackState(
@@ -57,10 +59,21 @@ class PlayerViewModel(
     var isUploading by mutableStateOf(false)
         private set
 
-    var uploadError by mutableStateOf<String?>(null)
+    var uploadItems = mutableStateListOf<UploadItemState>()
         private set
 
-    var uploadItems = mutableStateListOf<UploadItemState>()
+    /** Ошибка начальной загрузки треков — показывается в AlertDialog поверх заглушки. */
+    var loadError by mutableStateOf<AppError?>(null)
+        private set
+
+    var isRefreshing by mutableStateOf(false)
+        private set
+
+    /** Ошибка мутации (rename/delete/refresh) — показывается в AlertDialog поверх контента. */
+    var actionError by mutableStateOf<AppError?>(null)
+        private set
+
+    var downloadItems = mutableStateListOf<FileTransferItemState>()
         private set
 
     val player = MultitrackPlayer()
@@ -85,14 +98,14 @@ class PlayerViewModel(
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val trackColorPool = listOf(
-        androidx.compose.ui.graphics.Color(0xFFC75B39), // Terracotta
-        androidx.compose.ui.graphics.Color(0xFF7B6BA5), // Dusty Purple
-        androidx.compose.ui.graphics.Color(0xFF3D7A8A), // Teal
-        androidx.compose.ui.graphics.Color(0xFF8B7355), // Warm Brown
-        androidx.compose.ui.graphics.Color(0xFF5B8C5A), // Forest Green
-        androidx.compose.ui.graphics.Color(0xFFC49A3C), // Golden Amber
-        androidx.compose.ui.graphics.Color(0xFFA0576E), // Muted Rose
-        androidx.compose.ui.graphics.Color(0xFF4A7A6F), // Dark Sage
+        androidx.compose.ui.graphics.Color(0xFFC75B39),
+        androidx.compose.ui.graphics.Color(0xFF7B6BA5),
+        androidx.compose.ui.graphics.Color(0xFF3D7A8A),
+        androidx.compose.ui.graphics.Color(0xFF8B7355),
+        androidx.compose.ui.graphics.Color(0xFF5B8C5A),
+        androidx.compose.ui.graphics.Color(0xFFC49A3C),
+        androidx.compose.ui.graphics.Color(0xFFA0576E),
+        androidx.compose.ui.graphics.Color(0xFF4A7A6F),
     )
 
     fun setProject(project: Project, userId: String = "") {
@@ -101,6 +114,8 @@ class PlayerViewModel(
         tracks.clear()
         player.release()
         isLoaded = false
+        loadError = null
+        downloadItems.clear()
 
         viewModelScope.launch {
             try {
@@ -110,26 +125,95 @@ class PlayerViewModel(
                     evictStaleCache()
                     isLoaded = true
                 } else {
-                    loadProjectTracksIntoPlayer(repoTracks)
+                    loadProjectTracksIntoPlayer(repoTracks, trackProgress = true)
                 }
             } catch (e: Exception) {
                 println("SET_PROJECT_ERROR: ${e.message}")
+                loadError = e.toAppError("Не удалось загрузить дорожки")
                 isLoaded = true
             }
         }
     }
 
-    private fun loadProjectTracksIntoPlayer(projectTracks: List<ProjectTrack>) {
+    fun retryLoadTracks() {
+        val project = _project.value ?: return
+        if (isRefreshing) return
+        loadError = null
+        isLoaded = false
+        downloadItems.clear()
+        viewModelScope.launch {
+            try {
+                trackRepository.fetchTracks(project.id)
+                val repoTracks = trackRepository.tracks.value
+                if (repoTracks.isEmpty()) {
+                    evictStaleCache()
+                    isLoaded = true
+                } else {
+                    loadProjectTracksIntoPlayer(repoTracks, trackProgress = true)
+                }
+            } catch (e: Exception) {
+                println("RETRY_LOAD_ERROR: ${e.message}")
+                loadError = e.toAppError("Не удалось загрузить дорожки")
+                isLoaded = true
+            }
+        }
+    }
+
+    fun refreshTracks() {
+        val project = _project.value ?: return
+        if (isRefreshing) return
+        viewModelScope.launch {
+            isRefreshing = true
+            try {
+                trackRepository.fetchTracks(project.id)
+                val repoTracks = trackRepository.tracks.value
+                if (repoTracks.isNotEmpty()) {
+                    loadProjectTracksIntoPlayer(repoTracks, trackProgress = false)
+                }
+            } catch (e: Exception) {
+                actionError = e.toAppError("Не удалось обновить дорожки")
+            } finally {
+                isRefreshing = false
+            }
+        }
+    }
+
+    fun clearActionError() { actionError = null }
+
+    private fun loadProjectTracksIntoPlayer(
+        projectTracks: List<ProjectTrack>,
+        trackProgress: Boolean = true
+    ) {
         viewModelScope.launch {
             try {
                 isLoaded = false
 
-                val trackInfos = projectTracks.map { pt ->
-                    val bytes = trackRepository.getOrDownloadTrackBytes(pt.filePath)
-                    TrackInfo(name = pt.name, resourceBytes = bytes)
+                if (trackProgress) {
+                    downloadItems.clear()
+                    projectTracks.forEach { pt ->
+                        downloadItems.add(FileTransferItemState(name = pt.name))
+                    }
                 }
 
-                player.loadTracks(trackInfos)
+                val trackInfoList = mutableListOf<TrackInfo>()
+                projectTracks.forEachIndexed { index, pt ->
+                    if (trackProgress) {
+                        downloadItems[index] = downloadItems[index].copy(
+                            status = TransferStatus.IN_PROGRESS,
+                            progress = 0.1f
+                        )
+                    }
+                    val bytes = trackRepository.getOrDownloadTrackBytes(pt.filePath)
+                    trackInfoList.add(TrackInfo(name = pt.name, resourceBytes = bytes))
+                    if (trackProgress) {
+                        downloadItems[index] = downloadItems[index].copy(
+                            status = TransferStatus.DONE,
+                            progress = 1f
+                        )
+                    }
+                }
+
+                player.loadTracks(trackInfoList)
 
                 val savedSettings = _project.value?.id
                     ?.let { TrackSettingsStorage.load(it) }
@@ -157,10 +241,26 @@ class PlayerViewModel(
                 durationMs = player.getDurationMs()
                 isLoaded = true
 
+                if (trackProgress) downloadItems.clear()
+
                 evictStaleCache()
             } catch (e: Exception) {
                 println("LOAD_TRACKS_ERROR: ${e.message}")
                 e.printStackTrace()
+                val appError = e.toAppError("Не удалось загрузить дорожки")
+                if (trackProgress) {
+                    downloadItems.indices
+                        .filter { downloadItems[it].status != TransferStatus.DONE }
+                        .forEach { i ->
+                            downloadItems[i] = downloadItems[i].copy(
+                                status = TransferStatus.ERROR,
+                                error = appError
+                            )
+                        }
+                    loadError = appError
+                } else {
+                    actionError = appError
+                }
                 isLoaded = true
             }
         }
@@ -184,7 +284,7 @@ class PlayerViewModel(
                 repository.updateProjectName(project.id, newName)
                 _project.update { it?.copy(name = newName) }
             } catch (e: Exception) {
-                // Handle error if needed
+                actionError = e.toAppError("Не удалось переименовать проект")
             }
         }
     }
@@ -198,13 +298,9 @@ class PlayerViewModel(
                 _project.value = null
                 onSuccess()
             } catch (e: Exception) {
-                // Handle error if needed
+                actionError = e.toAppError("Не удалось удалить проект")
             }
         }
-    }
-
-    fun uploadAudio(file: PlatformFile) {
-        uploadMultipleAudio(listOf(file))
     }
 
     fun uploadMultipleAudio(files: List<PlatformFile>) {
@@ -214,13 +310,10 @@ class PlayerViewModel(
         uploadItems.clear()
         files.forEach { uploadItems.add(UploadItemState(file = it)) }
         isUploading = true
-        uploadError = null
 
         viewModelScope.launch {
             val jobs = files.mapIndexed { index, file ->
-                async {
-                    uploadSingleFile(project.id, index, file)
-                }
+                async { uploadSingleFile(project.id, index, file) }
             }
             jobs.awaitAll()
 
@@ -228,7 +321,7 @@ class PlayerViewModel(
             if (!anyFailed) {
                 isUploading = false
                 val updatedTracks = trackRepository.tracks.value
-                loadProjectTracksIntoPlayer(updatedTracks)
+                loadProjectTracksIntoPlayer(updatedTracks, trackProgress = false)
             }
         }
     }
@@ -238,16 +331,14 @@ class PlayerViewModel(
         try {
             val bytes = file.readBytes()
             uploadItems[index] = uploadItems[index].copy(progress = 0.5f)
-
             trackRepository.uploadTrack(projectId, file.name, bytes)
-
             uploadItems[index] = uploadItems[index].copy(status = UploadStatus.DONE, progress = 1f)
         } catch (e: Exception) {
             println("UPLOAD_ERROR[${file.name}]: ${e::class.simpleName}: ${e.message}")
             uploadItems[index] = uploadItems[index].copy(
                 status = UploadStatus.ERROR,
                 progress = 0f,
-                errorMessage = e.message ?: "Неизвестная ошибка"
+                error = e.toAppError("Ошибка загрузки файла")
             )
         }
     }
@@ -259,9 +350,7 @@ class PlayerViewModel(
 
         viewModelScope.launch {
             val jobs = failedIndices.map { index ->
-                async {
-                    uploadSingleFile(project.id, index, uploadItems[index].file)
-                }
+                async { uploadSingleFile(project.id, index, uploadItems[index].file) }
             }
             jobs.awaitAll()
 
@@ -269,7 +358,7 @@ class PlayerViewModel(
             if (!anyFailed) {
                 isUploading = false
                 val updatedTracks = trackRepository.tracks.value
-                loadProjectTracksIntoPlayer(updatedTracks)
+                loadProjectTracksIntoPlayer(updatedTracks, trackProgress = false)
             }
         }
     }
@@ -283,9 +372,10 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 trackRepository.deleteTrack(trackId, filePath)
-                loadProjectTracksIntoPlayer(trackRepository.tracks.value)
+                loadProjectTracksIntoPlayer(trackRepository.tracks.value, trackProgress = false)
             } catch (e: Exception) {
                 println("DELETE_TRACK_ERROR: ${e.message}")
+                actionError = e.toAppError("Не удалось удалить дорожку")
             }
         }
     }
@@ -300,6 +390,7 @@ class PlayerViewModel(
                 }
             } catch (e: Exception) {
                 println("RENAME_TRACK_ERROR: ${e.message}")
+                actionError = e.toAppError("Не удалось переименовать дорожку")
             }
         }
     }
@@ -337,16 +428,14 @@ class PlayerViewModel(
 
     fun toggleMute(trackIndex: Int) {
         if (trackIndex !in tracks.indices) return
-        val newMuted = !tracks[trackIndex].isMuted
-        tracks[trackIndex] = tracks[trackIndex].copy(isMuted = newMuted)
+        tracks[trackIndex] = tracks[trackIndex].copy(isMuted = !tracks[trackIndex].isMuted)
         updateEffectiveMutes()
         persistTrackSettings()
     }
 
     fun toggleSolo(trackIndex: Int) {
         if (trackIndex !in tracks.indices) return
-        val newSolo = !tracks[trackIndex].isSolo
-        tracks[trackIndex] = tracks[trackIndex].copy(isSolo = newSolo)
+        tracks[trackIndex] = tracks[trackIndex].copy(isSolo = !tracks[trackIndex].isSolo)
         updateEffectiveMutes()
         persistTrackSettings()
     }
@@ -375,7 +464,6 @@ class PlayerViewModel(
             while (isActive) {
                 currentPositionMs = player.getCurrentPositionMs()
                 durationMs = player.getDurationMs().takeIf { it > 0 } ?: durationMs
-
                 if (durationMs > 0 && currentPositionMs >= durationMs) {
                     player.stop()
                     isPlaying = false

@@ -45,11 +45,11 @@ Compose UI (Screen) → ViewModel → Repository → Supabase / local cache
 
 **Key layers:**
 - `ui/theme/` — `CasaNostraTheme`, `CasaNostraLightColors`, `CasaNostraTypography` (Material3 light color scheme)
-- `ui/common/` — `LockScreenOrientation` (`expect`/`actual`), `CasaNostraCard`, `ReadOnlyBadge` (shared UI components)
+- `ui/common/` — `LockScreenOrientation` (`expect`/`actual`), `CasaNostraCard`, `ReadOnlyBadge`, `ErrorAlertDialog` (shared UI components); `AppError` data class + `toAppError()` extension for unified error handling
 - `ui/auth/` — `AuthScreen`, `AuthViewModel`, `AuthState`
 - `ui/workspaces/` — `WorkspacesScreen`, `WorkspacesViewModel`, `GuestWorkspaceScreen`, `GuestWorkspaceViewModel`
 - `ui/projects/` — `ProjectsScreen`, `ProjectsViewModel`, `ProjectsState`
-- `ui/player/` — `PlayerScreen`, `PlayerViewModel`, `TrackRow`, `PlaybackControls`, `PlayerHeader`, `MuteSoloButton`, `UploadProgressOverlay`
+- `ui/player/` — `PlayerScreen`, `PlayerViewModel`, `TrackRow`, `PlaybackControls`, `PlayerHeader`, `MuteSoloButton`, `UploadProgressOverlay`, `DownloadProgressOverlay`, `FileTransferState`
 - `data/models/` — `Workspace`, `WorkspaceMember`, `Project`, `ProjectTrack` (all in `ProjectModels.kt`, kotlinx-serialization)
 - `data/repository/` — `WorkspaceRepository`, `ProjectRepository`, `TrackRepository` — remote Supabase ops + cache coordination
 - `audio/MultitrackPlayer` — `expect`/`actual`: Android uses Media3/ExoPlayer, iOS uses AVFoundation, Web uses Web Audio API
@@ -212,8 +212,11 @@ Before writing any inline UI code, **check whether a ready-made component alread
 |-----------|------|-------------|
 | `CasaNostraCard` | `ui/common/Components.kt` | Any clickable card (workspace, project, etc.) |
 | `ReadOnlyBadge` | `ui/common/Components.kt` | Wherever read-only mode needs to be indicated |
+| `ErrorAlertDialog` | `ui/common/Components.kt` | All error states — shows user-friendly message + expandable raw detail (copyable) |
 | `MuteSoloSegmentedButton` | `ui/player/MuteSoloButton.kt` | Mute/Solo control on a track row |
 | `UploadProgressOverlay` | `ui/player/UploadProgressOverlay.kt` | Track upload progress display in PlayerScreen |
+| `DownloadProgressOverlay` | `ui/player/DownloadProgressOverlay.kt` | Per-track download progress during initial project load |
+| `FileTransferTrackCard` | `ui/player/FileTransferState.kt` | Single track row inside upload/download progress overlays |
 
 ### When to Extract a Component
 

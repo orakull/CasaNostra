@@ -10,19 +10,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
+import com.orakull.casanostra.ui.common.ErrorAlertDialog
 import com.orakull.casanostra.ui.common.LockScreenOrientation
 import com.orakull.casanostra.ui.common.ScreenOrientation
 import io.github.vinceglb.filekit.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.core.PickerMode
 import io.github.vinceglb.filekit.core.PickerType
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     viewModel: PlayerViewModel,
@@ -37,13 +39,15 @@ fun PlayerScreen(
     val durationMs = viewModel.durationMs
     val tracks = viewModel.tracks
     val isLoaded = viewModel.isLoaded
+    val loadError = viewModel.loadError
+    val actionError = viewModel.actionError
+    val downloadItems = viewModel.downloadItems
     val project by viewModel.project.collectAsState()
     val projectTracks by viewModel.projectTracks.collectAsState()
     val isUploading = viewModel.isUploading
 
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
-
     var selectedTrackId by remember { mutableStateOf<String?>(null) }
     var selectedTrackFilePath by remember { mutableStateOf<String?>(null) }
     var showTrackEditDialog by remember { mutableStateOf(false) }
@@ -54,14 +58,12 @@ fun PlayerScreen(
         mode = PickerMode.Multiple(),
         title = "Выберите аудиофайлы"
     ) { files ->
-        files?.takeIf { it.isNotEmpty() }?.let {
-            viewModel.uploadMultipleAudio(it)
-        }
+        files?.takeIf { it.isNotEmpty() }?.let { viewModel.uploadMultipleAudio(it) }
     }
 
     Scaffold(
         floatingActionButton = {
-            if (isLoaded && !isReadOnly) {
+            if (isLoaded && loadError == null && !isReadOnly) {
                 FloatingActionButton(
                     onClick = { filePickerLauncher.launch() },
                     containerColor = MaterialTheme.colorScheme.primary
@@ -78,163 +80,214 @@ fun PlayerScreen(
                 .background(MaterialTheme.colorScheme.background)
                 .systemBarsPadding()
         ) {
-            if (!isLoaded) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
-            } else {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val isLandscape = maxWidth > maxHeight
+            when {
+                !isLoaded && loadError == null && downloadItems.isEmpty() -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 80.dp)
-                    ) {
-                        if (!isLandscape) {
-                            item {
-                                PlayerToolbar(
-                                    projectName = project?.name ?: "Проект",
-                                    onBack = onBack,
-                                    onRenameClick = { isEditingName = true },
-                                    onDeleteClick = { showDeleteConfirmation = true },
-                                    isReadOnly = isReadOnly
-                                )
-                                HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    thickness = 0.5.dp
-                                )
-                            }
+                !isLoaded && downloadItems.isNotEmpty() -> {
+                    DownloadProgressOverlay(
+                        items = downloadItems,
+                        onRetry = { viewModel.retryLoadTracks() }
+                    )
+                }
+
+                // Ошибка загрузки: показываем заглушку + ErrorAlertDialog
+                loadError != null -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Filled.MusicNote,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.outlineVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                "Дорожки недоступны",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                    }
 
-                        stickyHeader {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                color = MaterialTheme.colorScheme.background,
-                                shadowElevation = 2.dp
+                    ErrorAlertDialog(
+                        error = loadError,
+                        onDismiss = { viewModel.retryLoadTracks() },
+                        onRetry = { viewModel.retryLoadTracks() },
+                        title = "Ошибка загрузки"
+                    )
+                }
+
+                else -> {
+                    PullToRefreshBox(
+                        isRefreshing = viewModel.isRefreshing,
+                        onRefresh = { viewModel.refreshTracks() },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                            val isLandscape = maxWidth > maxHeight
+
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(bottom = 80.dp)
                             ) {
-                                if (isLandscape) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        TransportControls(
-                                            isPlaying = isPlaying,
-                                            onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
-                                            onRewind = { viewModel.seekTo(0) },
-                                            onStop = { viewModel.stop() },
-                                            isLoaded = isLoaded,
-                                            playButtonSize = 48.dp,
-                                            playIconSize = 24.dp,
-                                            modifier = Modifier.padding(end = 24.dp)
+                                if (!isLandscape) {
+                                    item {
+                                        PlayerToolbar(
+                                            projectName = project?.name ?: "Проект",
+                                            onBack = onBack,
+                                            onRenameClick = { isEditingName = true },
+                                            onDeleteClick = { showDeleteConfirmation = true },
+                                            isReadOnly = isReadOnly
                                         )
-                                        ProgressBar(
-                                            currentPositionMs = currentPositionMs,
-                                            durationMs = durationMs,
-                                            isLoaded = isLoaded,
-                                            onSeek = { viewModel.seekTo(it) },
-                                            isLandscape = true,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                } else {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 20.dp, vertical = 12.dp)
-                                    ) {
-                                        ProgressBar(
-                                            currentPositionMs = currentPositionMs,
-                                            durationMs = durationMs,
-                                            isLoaded = isLoaded,
-                                            onSeek = { viewModel.seekTo(it) },
-                                            isLandscape = false,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        TransportControls(
-                                            isPlaying = isPlaying,
-                                            onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
-                                            onRewind = { viewModel.seekTo(0) },
-                                            onStop = { viewModel.stop() },
-                                            isLoaded = isLoaded,
-                                            modifier = Modifier.fillMaxWidth()
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                            thickness = 0.5.dp
                                         )
                                     }
                                 }
-                            }
-                        }
 
-                        if (tracks.isEmpty() && isLoaded) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillParentMaxWidth()
-                                        .height(300.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                stickyHeader {
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = MaterialTheme.colorScheme.background,
+                                        shadowElevation = 2.dp
+                                    ) {
+                                        if (isLandscape) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                TransportControls(
+                                                    isPlaying = isPlaying,
+                                                    onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
+                                                    onRewind = { viewModel.seekTo(0) },
+                                                    onStop = { viewModel.stop() },
+                                                    isLoaded = isLoaded,
+                                                    playButtonSize = 48.dp,
+                                                    playIconSize = 24.dp,
+                                                    modifier = Modifier.padding(end = 24.dp)
+                                                )
+                                                ProgressBar(
+                                                    currentPositionMs = currentPositionMs,
+                                                    durationMs = durationMs,
+                                                    isLoaded = isLoaded,
+                                                    onSeek = { viewModel.seekTo(it) },
+                                                    isLandscape = true,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        } else {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                                            ) {
+                                                ProgressBar(
+                                                    currentPositionMs = currentPositionMs,
+                                                    durationMs = durationMs,
+                                                    isLoaded = isLoaded,
+                                                    onSeek = { viewModel.seekTo(it) },
+                                                    isLandscape = false,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                TransportControls(
+                                                    isPlaying = isPlaying,
+                                                    onPlayPause = { if (isPlaying) viewModel.pause() else viewModel.play() },
+                                                    onRewind = { viewModel.seekTo(0) },
+                                                    onStop = { viewModel.stop() },
+                                                    isLoaded = isLoaded,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (tracks.isEmpty()) {
+                                    item {
                                         Box(
                                             modifier = Modifier
-                                                .size(80.dp)
-                                                .background(
-                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(20.dp)
-                                                ),
+                                                .fillParentMaxWidth()
+                                                .height(300.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(
-                                                Icons.Filled.MusicNote,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(36.dp),
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(80.dp)
+                                                        .background(
+                                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                                            RoundedCornerShape(20.dp)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        Icons.Filled.MusicNote,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(36.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Text(
+                                                    "В проекте пока нет дорожек",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    "Нажмите + чтобы добавить аудио",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                )
+                                            }
                                         }
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text(
-                                            "В проекте пока нет дорожек",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            "Нажмите + чтобы добавить аудио",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                        )
                                     }
+                                }
+
+                                item { Spacer(modifier = Modifier.height(16.dp)) }
+
+                                itemsIndexed(tracks) { index, track ->
+                                    TrackRow(
+                                        track = track,
+                                        index = index,
+                                        onVolumeChange = { volume -> viewModel.setVolume(index, volume) },
+                                        onMuteToggle = { viewModel.toggleMute(index) },
+                                        onSoloToggle = { viewModel.toggleSolo(index) },
+                                        onTrackClick = if (isReadOnly) null else {
+                                            {
+                                                val dbTrack = projectTracks.getOrNull(index)
+                                                if (dbTrack != null) {
+                                                    selectedTrackId = dbTrack.id
+                                                    selectedTrackFilePath = dbTrack.filePath
+                                                    showTrackEditDialog = true
+                                                }
+                                            }
+                                        }
+                                    )
                                 }
                             }
-                        }
-
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
-
-                        itemsIndexed(tracks) { index, track ->
-                            TrackRow(
-                                track = track,
-                                index = index,
-                                onVolumeChange = { volume -> viewModel.setVolume(index, volume) },
-                                onMuteToggle = { viewModel.toggleMute(index) },
-                                onSoloToggle = { viewModel.toggleSolo(index) },
-                                onTrackClick = if (isReadOnly) null else {
-                                    {
-                                        val dbTrack = projectTracks.getOrNull(index)
-                                        if (dbTrack != null) {
-                                            selectedTrackId = dbTrack.id
-                                            selectedTrackFilePath = dbTrack.filePath
-                                            showTrackEditDialog = true
-                                        }
-                                    }
-                                }
-                            )
                         }
                     }
                 }
             }
 
-            // Dialogs
+            // Ошибка мутации — контент остаётся видимым, диалог поверх
+            if (actionError != null) {
+                ErrorAlertDialog(
+                    error = actionError,
+                    onDismiss = { viewModel.clearActionError() }
+                )
+            }
+
+            // Диалоги редактирования
             if (isEditingName) {
                 var newName by remember { mutableStateOf(project?.name ?: "") }
                 val focusRequester = remember { FocusRequester() }
@@ -253,9 +306,7 @@ fun PlayerScreen(
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.focusRequester(focusRequester)
                         )
-                        LaunchedEffect(Unit) {
-                            focusRequester.requestFocus()
-                        }
+                        LaunchedEffect(Unit) { focusRequester.requestFocus() }
                     },
                     confirmButton = {
                         Button(
@@ -266,14 +317,10 @@ fun PlayerScreen(
                                 }
                             },
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Сохранить")
-                        }
+                        ) { Text("Сохранить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { isEditingName = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { isEditingName = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -284,7 +331,7 @@ fun PlayerScreen(
                     shape = RoundedCornerShape(24.dp),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     title = { Text("Удалить проект?") },
-                    text = { Text("Проект \"${project?.name ?: ""}\" будет удален безвозвратно. Это действие нельзя отменить.") },
+                    text = { Text("Проект \"${project?.name ?: ""}\" будет удалён безвозвратно.") },
                     confirmButton = {
                         Button(
                             onClick = {
@@ -293,14 +340,10 @@ fun PlayerScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Удалить")
-                        }
+                        ) { Text("Удалить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteConfirmation = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showDeleteConfirmation = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -325,9 +368,7 @@ fun PlayerScreen(
                                 shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.focusRequester(focusRequester).fillMaxWidth()
                             )
-                            LaunchedEffect(Unit) {
-                                focusRequester.requestFocus()
-                            }
+                            LaunchedEffect(Unit) { focusRequester.requestFocus() }
                             Spacer(modifier = Modifier.height(16.dp))
                             OutlinedButton(
                                 onClick = {
@@ -340,7 +381,7 @@ fun PlayerScreen(
                                 shape = RoundedCornerShape(16.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Outlined.Delete, contentDescription = "Удалить трек")
+                                Icon(Icons.Outlined.Delete, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Удалить трек из проекта")
                             }
@@ -355,14 +396,10 @@ fun PlayerScreen(
                                 showTrackEditDialog = false
                             },
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Сохранить")
-                        }
+                        ) { Text("Сохранить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showTrackEditDialog = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showTrackEditDialog = false }) { Text("Отмена") }
                     }
                 )
             }
@@ -384,20 +421,15 @@ fun PlayerScreen(
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Удалить")
-                        }
+                        ) { Text("Удалить") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showTrackDeleteDialog = false }) {
-                            Text("Отмена")
-                        }
+                        TextButton(onClick = { showTrackDeleteDialog = false }) { Text("Отмена") }
                     }
                 )
             }
         }
 
-        // Upload Progress Overlay
         if (isUploading) {
             UploadProgressOverlay(
                 uploadItems = viewModel.uploadItems,
